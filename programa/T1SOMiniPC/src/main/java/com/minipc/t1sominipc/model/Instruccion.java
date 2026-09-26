@@ -20,7 +20,7 @@ public class Instruccion {
         * Entrada: String operador, String reg1, String reg2, Integer valor, String lineaOriginal
         * Salida: void
      */
-    public Instruccion(String operador, String reg1, String reg2, int valor, List<Integer> parametros, String lineaOriginal) {
+    public Instruccion(String operador, String reg1, String reg2, Integer valor, List<Integer> parametros, String lineaOriginal) {
         this.operador = operador;
         this.reg1 = reg1;
         this.reg2 = reg2;
@@ -74,9 +74,9 @@ public class Instruccion {
         * Nombre: getValor
         * Descripción: Devuelve el valor de la instrucción.
         * Entrada: void
-        * Salida: int
+        * Salida: Integer
      */
-    public int getValor() {
+    public Integer getValor() {
         return valor;
     }
 
