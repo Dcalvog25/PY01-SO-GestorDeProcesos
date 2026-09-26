@@ -279,21 +279,7 @@ public class ControllerMiniPC {
      */
     private void aplicarConfiguracion() {
         int nuevoTamano = (Integer) vista.getSpinnerTamanoRAM().getValue();
-        int nuevoKernel = (Integer) vista.getSpinnerKernel().getValue();
-
-        if (nuevoKernel >= nuevoTamano) {
-            JOptionPane.showMessageDialog(vista,
-                    "El espacio de kernel debe ser menor que el tamaño total de RAM",
-                    "Configuración inválida", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
-
-        if(nuevoKernel> (nuevoTamano-16)){
-            JOptionPane.showMessageDialog(vista,
-                    "El espacio de kernel debe dejar al menos 16 direcciones para el usuario",
-                    "Configuración inválida", JOptionPane.ERROR_MESSAGE);
-            return;
-        }
+        int nuevoKernel = Math.max((int) Math.round(nuevoTamano * 0.25), 16); // mismo cálculo que usa la vista
 
         inicializarMaquina(nuevoTamano, nuevoKernel);
         programaActual = null;
@@ -302,6 +288,13 @@ public class ControllerMiniPC {
         vista.getModeloPrograma().setRowCount(0);
         vista.getModeloMemoria().setRowCount(0);
         vista.getLblPID().setText("PID --");
+
+        vista.getBtnCargarArchivo().setEnabled(true);
+        vista.getBtnPasoAPaso().setEnabled(true);
+        vista.getBtnEjecutarTodo().setEnabled(true);
+        vista.getBtnConfigurarMemoria().setEnabled(true);
+        vista.getBtnLimpiarReset().setEnabled(true);
+
         actualizarVista();
     }
 
@@ -343,40 +336,44 @@ public class ControllerMiniPC {
 
         int finKernel = memoria.getFinMemoriaKernel();
         int inicioUsuario = memoria.getInicioMemoriaUsuario();
+        int finTotal = memoria.getTamanoTotal() - 1;
 
-        if(programaActual != null){ 
-            int pos = 0;
-            while (pos <= finKernel) {
-                String label = memoria.getLabel(pos);
+        // ===== Sección KERNEL: atributos del BCP + huecos agrupados =====
+        int pos = 0;
+        while (pos <= finKernel) {
+            String label = memoria.getLabel(pos);
 
-                if (label != null && !label.isEmpty()) {
-                    modelo.addRow(new Object[]{String.valueOf(pos), label, memoria.leer(pos)});
+            if (label != null && !label.isEmpty()) {
+                modelo.addRow(new Object[]{String.valueOf(pos), label, memoria.leer(pos)});
+                pos++;
+            } else {
+                int inicioLibre = pos;
+                while (pos <= finKernel && (memoria.getLabel(pos) == null || memoria.getLabel(pos).isEmpty())) {
                     pos++;
-                } else {
-                    int inicioLibre = pos;
-                    while (pos <= finKernel && (memoria.getLabel(pos) == null || memoria.getLabel(pos).isEmpty())) {
-                        pos++;
-                    }
-                    int finLibre = pos - 1;
-                    String rango = (inicioLibre == finLibre)
-                            ? String.valueOf(inicioLibre)
-                            : inicioLibre + "-" + finLibre;
-                    modelo.addRow(new Object[]{rango, "Kernel Libre", "-"});
                 }
+                int finLibre = pos - 1;
+                String rango = (inicioLibre == finLibre) ? String.valueOf(inicioLibre) : inicioLibre + "-" + finLibre;
+                modelo.addRow(new Object[]{rango, "Kernel Libre", "-"});
             }
-
         }
-        
 
         // ===== Sección USUARIO: instrucciones cargadas =====
-        if (programaActual != null) {
-            int fin = inicioUsuario + programaActual.size();
-            for (int direccion = inicioUsuario; direccion < fin; direccion++) {
+        int posUsuario = inicioUsuario;
+        if (procesoAdmitido && programaActual != null) {
+            int finPrograma = inicioUsuario + programaActual.size();
+            for (int direccion = inicioUsuario; direccion < finPrograma; direccion++) {
                 Instruccion instr = memoria.leerInstruccion(direccion);
                 String textoInstr = (instr != null) ? instr.getLineaOriginal() : "";
-                String valorMemoria = formatoValorMemoria(memoria.leer(direccion));
-                modelo.addRow(new Object[]{direccion, textoInstr, valorMemoria});
+                String valorMostrado = formatoValorMemoria(memoria.leer(direccion));
+                modelo.addRow(new Object[]{direccion, textoInstr, valorMostrado});
             }
+            posUsuario = finPrograma;
+        }
+
+        // RESTO USUARIO: espacio libre agrupado en una sola fila
+        if (posUsuario <= finTotal) {
+            String rango = (posUsuario == finTotal) ? String.valueOf(posUsuario) : posUsuario + "-" + finTotal;
+            modelo.addRow(new Object[]{rango, "Usuario Libre", "-"});
         }
     }
 

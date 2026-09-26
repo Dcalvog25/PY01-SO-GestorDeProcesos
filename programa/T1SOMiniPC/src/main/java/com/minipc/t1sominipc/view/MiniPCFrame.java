@@ -30,7 +30,7 @@ public class MiniPCFrame extends JFrame {
 
     private JDialog dialogoConfigMemoria;
     private JSpinner spinnerTamanoRAM;
-    private JSpinner spinnerKernel;
+    private JLabel lblKernelCalculado;
     private JButton btnAplicarConfig;
 
     private DefaultTableModel modeloPrograma;
@@ -146,15 +146,22 @@ public class MiniPCFrame extends JFrame {
 
         JLabel lblTamano = crearEtiquetaCampo("Tamaño total de RAM");
         lblTamano.setAlignmentX(Component.LEFT_ALIGNMENT);
-        spinnerTamanoRAM = new JSpinner(new SpinnerNumberModel(256, 128, 1024, 8));
+        spinnerTamanoRAM = new JSpinner(new SpinnerNumberModel(256, 256, 10000, 8));
         spinnerTamanoRAM.setAlignmentX(Component.LEFT_ALIGNMENT);
         spinnerTamanoRAM.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
 
-        JLabel lblKernel = crearEtiquetaCampo("Espacio para Kernel");
-        lblKernel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        spinnerKernel = new JSpinner(new SpinnerNumberModel(64, 16, 512, 8));
-        spinnerKernel.setAlignmentX(Component.LEFT_ALIGNMENT);
-        spinnerKernel.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+        JLabel lblKernelInfo = crearEtiquetaCampo("Espacio de kernel (25% automático)");
+        lblKernelInfo.setAlignmentX(Component.LEFT_ALIGNMENT);
+        lblKernelCalculado = new JLabel("64 posiciones");
+        lblKernelCalculado.setForeground(ACCENT_GREEN);
+        lblKernelCalculado.setFont(new Font("Monospaced", Font.BOLD, 13));
+        lblKernelCalculado.setAlignmentX(Component.LEFT_ALIGNMENT);
+
+        spinnerTamanoRAM.addChangeListener(e -> {
+            int total = (Integer) spinnerTamanoRAM.getValue();
+            int kernel = Math.max((int) Math.round(total * 0.25), 16);
+            lblKernelCalculado.setText(kernel + " posiciones");
+});
 
         btnAplicarConfig = crearBoton("Aplicar configuración", BG_BUTTON_PRIMARY, TEXT_LIGHT);
         btnAplicarConfig.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -166,8 +173,8 @@ public class MiniPCFrame extends JFrame {
         panel.add(lblTamano);
         panel.add(spinnerTamanoRAM);
         panel.add(Box.createVerticalStrut(12));
-        panel.add(lblKernel);
-        panel.add(spinnerKernel);
+        panel.add(lblKernelInfo);
+        panel.add(lblKernelCalculado);
         panel.add(Box.createVerticalStrut(18));
         panel.add(btnAplicarConfig);
 
@@ -444,9 +451,6 @@ public class MiniPCFrame extends JFrame {
     }
     public JSpinner getSpinnerTamanoRAM() { 
         return spinnerTamanoRAM; 
-    }
-    public JSpinner getSpinnerKernel() { 
-        return spinnerKernel; 
     }
     public DefaultTableModel getModeloPrograma() { 
         return modeloPrograma; 
