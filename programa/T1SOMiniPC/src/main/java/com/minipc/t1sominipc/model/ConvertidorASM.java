@@ -91,6 +91,8 @@ public class ConvertidorASM {
     /*
         * Nombre: validarUnRegistro
         *Descripción: Para LOAD, STORE, ADD, SUB, PUSH, POP - todos esperan un solo registro.
+        * Entrada: String operador, String[] partes, int argumentos, int numeroLinea, String linea
+        * Salida: Instruccion - objeto Instruccion válido o null si hay error
      */
     private Instruccion validarUnRegistro(String operador, String[] partes, int argumentos, int numeroLinea, String linea) {
         if (argumentos != 1) {
@@ -110,6 +112,8 @@ public class ConvertidorASM {
     /*
         * Nombre: validarIncDec
         *Descripción: INC y DEC pueden ir solos (actúan sobre AC) o con un registro.
+        * Entrada: String operador, String[] partes, int argumentos, int numeroLinea, String linea
+        * Salida: Instruccion - objeto Instruccion válido o null si hay error   
      */
     private Instruccion validarIncDec(String operador, String[] partes, int argumentos, int numeroLinea, String linea) {
         if (argumentos == 0) {
@@ -131,7 +135,9 @@ public class ConvertidorASM {
 
     /*
         * Nombre: validarMov
-        *Descripción: MOV puede ser reg,reg o reg,valor. Se revisa si el segundo argumento es un registro.
+        * Descripción: MOV puede ser reg,reg o reg,valor. Se revisa si el segundo argumento es un registro.
+        * Entrada: String operador, String[] partes, int argumentos, int numeroLinea, String linea
+        * Salida: Instruccion - objeto Instruccion válido o null si hay error
      */
     private Instruccion validarMov(String operador, String[] partes, int argumentos, int numeroLinea, String linea) {
         if (argumentos != 2) {
@@ -166,7 +172,9 @@ public class ConvertidorASM {
 
     /*
         * Nombre: validarDosRegistros
-        *Descripción: Para CMP y SWAP - ambos esperan dos registros.
+        * Descripción: Para CMP y SWAP - ambos esperan dos registros.
+        * Entrada: String operador, String[] partes, int argumentos, int numeroLinea, String linea
+        * Salida: Instruccion - objeto Instruccion válido o null si hay error
      */
     private Instruccion validarDosRegistros(String operador, String[] partes, int argumentos, int numeroLinea, String linea) {
         if (argumentos != 2) {
@@ -187,7 +195,9 @@ public class ConvertidorASM {
 
     /*
         * Nombre: validarSalto
-        *Descripción: Para JMP, JE, JNE - esperan un desplazamiento numérico con signo.
+        * Descripción: Para JMP, JE, JNE - esperan un desplazamiento numérico con signo.
+        * Entrada: String operador, String[] partes, int argumentos, int numeroLinea, String linea
+        * Salida: Instruccion - objeto Instruccion válido o null si hay error
      */
     private Instruccion validarSalto(String operador, String[] partes, int argumentos, int numeroLinea, String linea) {
         if (argumentos != 1) {
@@ -210,7 +220,9 @@ public class ConvertidorASM {
 
     /*
         * Nombre: validarParam
-        *Descripción: PARAM acepta de 1 a 3 valores numéricos, se guardan en la lista de parámetros.
+        * Descripción: PARAM acepta de 1 a 3 valores numéricos, se guardan en la lista de parámetros.
+        * Entrada: String operador, String[] partes, int argumentos, int numeroLinea, String linea
+        * Salida: Instruccion - objeto Instruccion válido o null si hay error
      */
     private Instruccion validarParam(String operador, String[] partes, int argumentos, int numeroLinea, String linea) {
         if (argumentos < 1 || argumentos > 3) {
@@ -239,7 +251,9 @@ public class ConvertidorASM {
 
     /*
         * Nombre: validarInt
-        *Descripción: INT espera un código en hexadecimal (ej. 20H, 10H). Se convierte a decimal.
+        * Descripción: INT espera un código en hexadecimal (ej. 20H, 10H). Se convierte a decimal.
+        * Entrada: String operador, String[] partes, int argumentos, int numeroLinea, String linea
+        * Salida: Instruccion - objeto Instruccion válido o null si hay error
      */
     private Instruccion validarInt(String operador, String[] partes, int argumentos, int numeroLinea, String linea) {
         if (argumentos != 1) {
@@ -260,7 +274,9 @@ public class ConvertidorASM {
 
     /*
         * Nombre: operadorValido
-        *Descripción: Verifica si el operador está dentro del conjunto completo de operadores válidos.
+        * Descripción: Verifica si el operador está dentro del conjunto completo de operadores válidos.
+        * Entrada: String operador
+        * Salida: boolean - true si es válido, false en caso contrario
      */
     private boolean operadorValido(String operador) {
         if (operador.matches("LOAD|STORE|MOV|SUB|ADD|INC|DEC|SWAP|CMP|JMP|JE|JNE|PARAM|PUSH|POP|INT")) {
@@ -269,12 +285,25 @@ public class ConvertidorASM {
         return false;
     }
 
+    /*
+        * Nombre: registroValido
+        * Descripción: Verifica si el registro es uno de los registros válidos (AX, BX, CX, DX).
+        * Entrada: String registro
+        * Salida: boolean - true si es válido, false en caso contrario
+     */
     private boolean registroValido(String registro) {
         if (registro.matches("AX|BX|CX|DX")) {
             return true;
         }
         return false;
     }
+
+    /*
+        * Nombre: valorEnRango
+        * Descripción: Verifica si un valor numérico está dentro del rango permitido (-127 a 127).
+        * Entrada: int valor
+        * Salida: boolean - true si está en rango, false en caso contrario
+     */
 
     private boolean valorEnRango(int valor) {
         if (valor < -127 || valor > 127) {
@@ -283,14 +312,35 @@ public class ConvertidorASM {
         return true;
     }
 
+    /*
+        * Nombre: registrarError
+        * Descripción: Registra un error de conversión de ASM.
+        * Entrada: int numeroLinea, String lineaOriginal, String motivo
+        * Salida: void
+     */
+
     private void registrarError(int numeroLinea, String lineaOriginal, String motivo) {
         errores.add("Línea " + numeroLinea + ": \"" + lineaOriginal.trim() + "\" → " + motivo);
     }
+
+    /*
+        * Nombre: getErrores
+        * Descripción: Devuelve la lista de errores registrados durante la conversión de ASM.
+        * Entrada: void
+        * Salida: List<String> - lista de errores
+     */
 
     public List<String> getErrores() {
         return errores;
     }
 
+    /*
+        * Nombre: tieneErrores
+        * Descripción: Verifica si hay errores registrados durante la conversión de ASM.
+        * Entrada: void
+        * Salida: boolean - true si hay errores, false en caso contrario
+     */
+    
     public boolean tieneErrores() {
         if (errores == null || errores.isEmpty()) {
             return false;
