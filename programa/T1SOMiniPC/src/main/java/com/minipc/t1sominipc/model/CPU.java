@@ -19,9 +19,11 @@ public class CPU {
     private int AC; // Accumulator
 
     private boolean banderaIgual; // resultado de la última comparación (CMP), la usan JE/JNE
+    private boolean esperandoEntrada;
 
     private Memoria memoria;
     private BCP bcp;
+    private Pantalla pantalla;
 
     private String ultimoError; // mensaje de error controlado
 
@@ -33,9 +35,10 @@ public class CPU {
         * Entrada: Memoria memoria, BCP bcp
         * Salida: void
      */
-    public CPU(Memoria memoria, BCP bcp) {
+    public CPU(Memoria memoria, BCP bcp, Pantalla pantalla) {
         this.memoria = memoria;
         this.bcp = bcp;
+        this.pantalla = pantalla;
         inicializarRegistros();
     }
 
@@ -79,6 +82,11 @@ public class CPU {
         * Salida: boolean - false si ya no hay más instrucciones o el programa terminó
      */
     public boolean paso() {
+
+        if(esperandoEntrada) {
+            return true;
+        }
+
         ultimoError = null;
 
         Instruccion actual = memoria.leerInstruccion(PC);
@@ -93,6 +101,10 @@ public class CPU {
 
         boolean salto = ejecutar(actual);
 
+         if (esperandoEntrada) {
+            return true; // la instrucción quedó a medias, esperando INT 09H
+        }
+
         if (!salto) {
             PC++;
         }
@@ -106,6 +118,28 @@ public class CPU {
         }
 
         return true;
+    }
+
+    /*
+        * Nombre: recibirEntrada
+        * Descripción: El Controller llama esto cuando el usuario presiona Enter
+        * en el panel de pantalla, completando la instrucción INT 09H que quedó pausada.
+     */
+    public void recibirEntrada(int valor) {
+        if (!esperandoEntrada) {
+            return;
+        }
+        DX = valor;
+        pantalla.imprimir(String.valueOf(valor));
+        esperandoEntrada = false;
+
+        PC++;
+        bcp.avanzarContador();
+        bcp.actualizarRegistros(PC, AC, AX, BX, CX, DX);
+    }
+
+    public boolean isEsperandoEntrada() {
+        return esperandoEntrada;
     }
 
     /*
@@ -226,7 +260,7 @@ public class CPU {
                     }
                 }
                 return false;
-                
+
             case "INT":
                 ejecutarInterrupcion(valor);
                 return false;
@@ -245,7 +279,7 @@ public class CPU {
 
     private boolean realizarSalto(int direccionDestino) {
         int inicio = memoria.getInicioMemoriaUsuario();
-        int fin = inicio + programaActualTamano - 1; // necesitas guardar el tamaño del programa cargado
+        int fin = inicio + programaActualTamano - 1; 
 
         if (direccionDestino < inicio || direccionDestino > fin) {
             ultimoError = "Salto fuera de rango del programa: intentó ir a la posición " + direccionDestino;
@@ -258,16 +292,25 @@ public class CPU {
 
     /*
         * Nombre: ejecutarInterrupcion
-        * Descripción: Maneja las interrupciones. Por ahora solo INT 20H (fin de programa)
-        * está resuelta aquí; el resto (teclado, pantalla, archivos) se conecta en el
-        * paso de ManejadorInterrupciones más adelante.
+        * Descripción: INT 20H termina el programa (se detecta en esFinDePrograma).
+        * INT 10H imprime DX en pantalla de inmediato. INT 09H pausa la ejecución
+        * hasta que el Controller entregue un valor con recibirEntrada().
+        * INT 21H (archivos) queda pendiente hasta construir Disco.
      */
     private void ejecutarInterrupcion(int codigo) {
         if (codigo == 0x20) {
-            return; // el fin de programa se detecta en esFinDePrograma()
+            return;
         }
-        ultimoError = "Interrupción INT " + Integer.toHexString(codigo).toUpperCase()
-                + "H todavía no está implementada";
+        if (codigo == 0x10) {
+            pantalla.imprimir(String.valueOf(DX));
+            return;
+        }
+        if (codigo == 0x09) {
+            pantalla.imprimir(">> Ingresar valor:");
+            esperandoEntrada = true;
+            return;
+        }
+        ultimoError = "Interrupción INT " + Integer.toHexString(codigo).toUpperCase() + "H todavía no está implementada";
     }
 
     /*
