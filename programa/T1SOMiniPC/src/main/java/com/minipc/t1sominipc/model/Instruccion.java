@@ -13,20 +13,22 @@ public class Instruccion {
     private Integer valor;
     private List<Integer> parametros;
     private String lineaOriginal; 
+    private String valorTexto; // solo se usa cuando MOV DX recibe algo entre comillas
 
     /*
         * Nombre: Instruccion
         * Descripción: Constructor de la clase Instruccion.
-        * Entrada: String operador, String reg1, String reg2, Integer valor, String lineaOriginal
+        * Entrada: String operador, String reg1, String reg2, Integer valor, List<Integer> parametros, String valorTexto, String lineaOriginal
         * Salida: void
      */
-    public Instruccion(String operador, String reg1, String reg2, Integer valor, List<Integer> parametros, String lineaOriginal) {
+    public Instruccion(String operador, String reg1, String reg2, Integer valor, List<Integer> parametros, String valorTexto, String lineaOriginal) {
         this.operador = operador;
         this.reg1 = reg1;
         this.reg2 = reg2;
         this.valor = valor;
         this.parametros = parametros;
         this.lineaOriginal = lineaOriginal;
+        this.valorTexto = valorTexto;
     }
 
     /*
@@ -89,5 +91,14 @@ public class Instruccion {
 
     public String getLineaOriginal() {
         return lineaOriginal;
+    }
+    /*
+        * Nombre: getValorTexto
+        * Descripción: Devuelve el valor de texto de la instrucción.
+        * Entrada: void
+        * Salida: String
+     */
+    public String getValorTexto() {
+        return valorTexto;
     }
 }

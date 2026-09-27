@@ -1,5 +1,6 @@
 package com.minipc.t1sominipc.model;
 
+import java.lang.reflect.Constructor;
 import java.util.List;
 
 /* 
@@ -28,6 +29,8 @@ public class CPU {
     private String ultimoError; // mensaje de error controlado
 
     private int programaActualTamano; // tamaño del programa cargado en memoria
+
+    private String dxTexto; // el "modo texto" de DX, separado del DX numérico
 
     /*
         * Nombre: CPU
@@ -178,7 +181,9 @@ public class CPU {
                 return false;
 
             case "MOV":
-                if (reg2 != null) {
+                if (instruccion.getValorTexto() != null) {
+                    dxTexto = instruccion.getValorTexto(); // MOV DX, "prog1"
+                } else if (reg2 != null) {
                     setRegistro(reg1, getRegistro(reg2));
                 } else {
                     setRegistro(reg1, valor);

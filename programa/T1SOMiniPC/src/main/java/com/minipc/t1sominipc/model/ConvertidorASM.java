@@ -106,7 +106,7 @@ public class ConvertidorASM {
             return null;
         }
 
-        return new Instruccion(operador, registro, null, null, null, linea);
+        return new Instruccion(operador, registro, null, null, null, null, linea);
     }
 
     /*
@@ -117,7 +117,7 @@ public class ConvertidorASM {
      */
     private Instruccion validarIncDec(String operador, String[] partes, int argumentos, int numeroLinea, String linea) {
         if (argumentos == 0) {
-            return new Instruccion(operador, null, null, null, null, linea);
+            return new Instruccion(operador, null, null, null, null, null, linea);
         }
 
         if (argumentos == 1) {
@@ -126,7 +126,7 @@ public class ConvertidorASM {
                 registrarError(numeroLinea, linea, "Registro no reconocido: '" + partes[1] + "'");
                 return null;
             }
-            return new Instruccion(operador, registro, null, null, null, linea);
+            return new Instruccion(operador, registro, null, null, null, null, linea);
         }
 
         registrarError(numeroLinea, linea, operador + " espera 0 o 1 argumento");
@@ -151,19 +151,31 @@ public class ConvertidorASM {
             return null;
         }
 
-        String segundo = partes[2].toUpperCase();
+        String segundo = partes[2];
 
-        if (registroValido(segundo)) {
-            return new Instruccion(operador, reg1, segundo, null, null, linea);
+        //  MOV DX, "nombre" - el texto viene entre comillas
+        if (segundo.startsWith("\"") && segundo.endsWith("\"")) {
+            if (!reg1.equals("DX")) {
+                registrarError(numeroLinea, linea, "Solo DX puede recibir texto (para nombres de archivo)");
+                return null;
+            }
+            String texto = segundo.substring(1, segundo.length() - 1); // quita las comillas
+            return new Instruccion(operador, reg1, null, null, null, texto, linea);
+        }
+
+       
+        String segundoMayus = segundo.toUpperCase();
+        if (registroValido(segundoMayus)) {
+            return new Instruccion(operador, reg1, segundoMayus, null, null, null, linea);
         }
 
         try {
-            int valor = Integer.parseInt(partes[2]);
+            int valor = Integer.parseInt(segundo);
             if (!valorEnRango(valor)) {
                 registrarError(numeroLinea, linea, "Valor fuera de rango (-127 a 127): " + valor);
                 return null;
             }
-            return new Instruccion(operador, reg1, null, valor, null, linea);
+            return new Instruccion(operador, reg1, null, valor, null, null, linea);
         } catch (NumberFormatException e) {
             registrarError(numeroLinea, linea, "Segundo argumento inválido: '" + partes[2] + "'");
             return null;
@@ -190,7 +202,7 @@ public class ConvertidorASM {
             return null;
         }
 
-        return new Instruccion(operador, reg1, reg2, null, null, linea);
+        return new Instruccion(operador, reg1, reg2, null, null, null,linea);
     }
 
     /*
@@ -211,7 +223,7 @@ public class ConvertidorASM {
                 registrarError(numeroLinea, linea, "Desplazamiento fuera de rango (-127 a 127): " + desplazamiento);
                 return null;
             }
-            return new Instruccion(operador, null, null, desplazamiento, null, linea);
+            return new Instruccion(operador, null, null, desplazamiento, null, null, linea);
         } catch (NumberFormatException e) {
             registrarError(numeroLinea, linea, "Desplazamiento no numérico: '" + partes[1] + "'");
             return null;
@@ -246,7 +258,7 @@ public class ConvertidorASM {
             }
         }
 
-        return new Instruccion(operador, null, null, null, parametros, linea);
+        return new Instruccion(operador, null, null, null, parametros, null, linea);
     }
 
     /*
@@ -265,7 +277,7 @@ public class ConvertidorASM {
 
         try {
             int codigo = Integer.parseInt(codigoTexto, 16);
-            return new Instruccion(operador, null, null, codigo, null, linea);
+            return new Instruccion(operador, null, null, codigo, null,   null, linea);
         } catch (NumberFormatException e) {
             registrarError(numeroLinea, linea, "Código de interrupción inválido: '" + partes[1] + "'");
             return null;
