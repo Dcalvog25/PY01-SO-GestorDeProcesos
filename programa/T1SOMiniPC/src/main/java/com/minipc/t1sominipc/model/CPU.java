@@ -200,7 +200,7 @@ public class CPU {
                 }
                 return false;
 
-            /* 
+            
             case "PUSH":
                 boolean cupoPush = bcp.getPila().push(getRegistro(reg1));
                 if (!cupoPush) {
@@ -226,7 +226,7 @@ public class CPU {
                     }
                 }
                 return false;
-            */
+                
             case "INT":
                 ejecutarInterrupcion(valor);
                 return false;

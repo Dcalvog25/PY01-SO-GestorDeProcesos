@@ -50,4 +50,11 @@ public class PilaBCP {
     public static int getTamanoFijo() {
         return tamanoFijo;
     }
+
+    public void reiniciar() {
+        cont = -1;
+        for (int i = 0; i < tamanoFijo; i++) {
+            memoria.escribir(direccionBase + i, 0, "Pila Libre");
+        }
+    }
 }

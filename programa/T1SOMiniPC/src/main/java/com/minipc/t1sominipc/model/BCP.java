@@ -16,9 +16,11 @@ public class BCP {
     private static final int POS_DX = 7;
     private static final int POS_BASE = 8;
     private static final int POS_CONTADOR = 9;
-    private static final int TAM_BCP = 10; 
+    private static final int POS_PILA = 10;
+    private static final int TAM_BCP = 15; 
 
     private Memoria memoria;
+    private PilaBCP pila;
 
     /*
      * El BCP se almacena en la memoria, en una posición específica.
@@ -28,7 +30,7 @@ public class BCP {
     public BCP(Memoria memoria, int pid, int baseUsuario) {
         this.memoria = memoria;
 
-        if(POS_CONTADOR > memoria.getFinMemoriaKernel()) {
+        if(TAM_BCP - 1 > memoria.getFinMemoriaKernel()) {
             throw new IllegalArgumentException("La memoria es demasiado pequeña para almacenar el BCP.");
         }
         memoria.escribir(POS_PID, pid, "PID");
@@ -41,6 +43,11 @@ public class BCP {
         memoria.escribir(POS_DX, 0, "DX");
         memoria.escribir(POS_BASE, baseUsuario, "Base");
         memoria.escribir(POS_CONTADOR, 0, "Contador");
+        pila = new PilaBCP(memoria, POS_PILA);
+    }
+
+    public PilaBCP getPila() {
+        return pila;
     }
 
     /*
