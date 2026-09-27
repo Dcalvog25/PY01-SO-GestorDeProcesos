@@ -23,7 +23,9 @@ public class CPU {
     private Memoria memoria;
     private BCP bcp;
 
-    private String ultimoError; // mensaje de error controlado)
+    private String ultimoError; // mensaje de error controlado
+
+    private int programaActualTamano; // tamaño del programa cargado en memoria
 
     /*
         * Nombre: CPU
@@ -65,6 +67,7 @@ public class CPU {
     public void cargarPrograma(List<Instruccion> programa) {
         memoria.limpiarMemoriaUsuario();
         memoria.cargarPrograma(programa);
+        programaActualTamano = programa.size();
         inicializarRegistros();
         bcp.reiniciar(memoria.getInicioMemoriaUsuario());
     }
@@ -183,20 +186,17 @@ public class CPU {
                 return false;
 
             case "JMP":
-                PC = PC + valor;
-                return true;
+                return realizarSalto(valor);
 
             case "JE":
                 if (banderaIgual) {
-                    PC = PC + valor;
-                    return true;
+                    return realizarSalto(valor);
                 }
                 return false;
 
             case "JNE":
                 if (!banderaIgual) {
-                    PC = PC + valor;
-                    return true;
+                    return realizarSalto(valor);
                 }
                 return false;
 
@@ -234,6 +234,26 @@ public class CPU {
             default:
                 throw new IllegalArgumentException("Operador no reconocido: " + operador);
         }
+    }
+
+    /*
+        * Nombre: realizarSalto
+        * Descripción: Realiza un salto a la dirección especificada si está dentro del rango del programa cargado.
+        * Entrada: int direccionDestino
+        * Salida: boolean - true si el salto fue exitoso, false si está fuera de rango
+    */
+
+    private boolean realizarSalto(int direccionDestino) {
+        int inicio = memoria.getInicioMemoriaUsuario();
+        int fin = inicio + programaActualTamano - 1; // necesitas guardar el tamaño del programa cargado
+
+        if (direccionDestino < inicio || direccionDestino > fin) {
+            ultimoError = "Salto fuera de rango del programa: intentó ir a la posición " + direccionDestino;
+            return false; // no saltamos, dejamos que PC++ siga su curso normal
+        }
+
+        PC = direccionDestino;
+        return true;
     }
 
     /*
