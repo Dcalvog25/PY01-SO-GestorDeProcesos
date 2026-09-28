@@ -156,7 +156,7 @@ public class ControllerMiniPC {
             }
 
             nombreProgramaActual = nombre;
-            bcp.actualizarEstado("Nuevo");
+            //bcp.actualizarEstado("Nuevo");
             vista.getLblPID().setText("PID 1");
             vista.getLblEstadoProceso().setText("Preparando memoria para el proceso...");
             actualizarTablaDisco();
@@ -432,7 +432,7 @@ public class ControllerMiniPC {
     private void actualizarTablaProcesos() {
         DefaultTableModel modelo = vista.getModeloProcesos();
         modelo.setRowCount(0);
-        if (programaActual != null) {
+        if (programaActual != null && bcp != null) {
             modelo.addRow(new Object[]{"PID 1", bcp.getEstado()});
         }
     }
