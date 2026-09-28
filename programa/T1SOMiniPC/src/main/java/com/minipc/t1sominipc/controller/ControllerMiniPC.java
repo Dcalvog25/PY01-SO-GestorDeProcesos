@@ -57,9 +57,10 @@ public class ControllerMiniPC {
      */
     private void inicializarMaquina(int tamanoRAM, int tamanoKernel) {
         memoria = new Memoria(tamanoRAM, tamanoKernel);
-        bcp = new BCP(memoria,  1, memoria.getInicioMemoriaUsuario());
+       // bcp = new BCP(memoria,  1, memoria.getInicioMemoriaUsuario());
+        bcp = null; // inicializa bcp como null hasta que se cargue un programa
         pantalla = new Pantalla();
-        cpu = new CPU(memoria, bcp, pantalla);
+        cpu = new CPU(memoria, pantalla);
         disco = new Disco(512, 64); // por ahora, estos números pasan a un archivo de configuración luego
         resetEntradaTeclado();
     }
@@ -184,8 +185,11 @@ public class ControllerMiniPC {
         try {
             List<Instruccion> desdeDisco = disco.leerArchivo(nombreProgramaActual);
             programaActual = desdeDisco;
+
+            bcp = new BCP(memoria, 0, 1, memoria.getInicioMemoriaUsuario(), desdeDisco.size(), 0);
+            cpu.asignarProceso(bcp); // en vez de que CPU ya lo tuviera fijo
             cpu.cargarPrograma(desdeDisco);
-            bcp.actualizarEstado("Listo");
+            bcp.actualizarEstado("Preparado");
             procesoAdmitido = true;
             //actualizarTablaMemoria();
 
@@ -365,9 +369,8 @@ public class ControllerMiniPC {
         *Descripción: Verifica si el proceso actual necesita ser reiniciado.
      */
     private boolean procesoHayQueResetear() {
-        return procesoAdmitido && !"Terminado".equals(bcp.getEstado());
+        return procesoAdmitido && bcp != null && !"Finalizado".equals(bcp.getEstado());
     }
-
     /*
         * Nombre: actualizarTablaMemoria
         *Entrada: void
@@ -545,7 +548,7 @@ public class ControllerMiniPC {
         vista.getLblBX().setText(String.valueOf(cpu.getBX()));
         vista.getLblCX().setText(String.valueOf(cpu.getCX()));
         vista.getLblDX().setText(String.valueOf(cpu.getDX()));
-        vista.getLblEstadoProceso().setText(bcp.getEstado());
+        vista.getLblEstadoProceso().setText(bcp != null ? bcp.getEstado() : "Esperando archivo");
 
         actualizarTablaMemoria();
         actualizarTablaProcesos();

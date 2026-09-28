@@ -38,7 +38,7 @@ public class CPU {
         * Entrada: Memoria memoria, BCP bcp
         * Salida: void
      */
-    public CPU(Memoria memoria, BCP bcp, Pantalla pantalla) {
+    public CPU(Memoria memoria, Pantalla pantalla) {
         this.memoria = memoria;
         this.bcp = bcp;
         this.pantalla = pantalla;
@@ -75,7 +75,24 @@ public class CPU {
         memoria.cargarPrograma(programa);
         programaActualTamano = programa.size();
         inicializarRegistros();
-        bcp.reiniciar(memoria.getInicioMemoriaUsuario());
+        //bcp.reiniciar(memoria.getInicioMemoriaUsuario());
+    }
+
+    /*
+        * Nombre: asignarProceso
+        * Descripcion: Asigna un nuevo proceso (BCP) a la CPU, actualizando los registros con los valores del BCP.
+        * Entrada: BCP nuevoBcp
+        * Salida: void
+     */
+    public void asignarProceso(BCP nuevoBcp) {
+        this.bcp = nuevoBcp;
+        this.AX = nuevoBcp.getAX();
+        this.BX = nuevoBcp.getBX();
+        this.CX = nuevoBcp.getCX();
+        this.DX = nuevoBcp.getDX();
+        this.AC = nuevoBcp.getAC();
+        this.PC = nuevoBcp.getPC();
+        this.programaActualTamano = nuevoBcp.getTamano();
     }
 
     /*
@@ -90,7 +107,7 @@ public class CPU {
             return true;
         }
 
-        if ("Terminado".equals(bcp.getEstado())) {
+        if ("Finalizado".equals(bcp.getEstado())) {
             return false;
         }
 
@@ -99,7 +116,7 @@ public class CPU {
         Instruccion actual = memoria.leerInstruccion(PC);
 
         if (actual == null) {
-            bcp.actualizarEstado("Terminado");
+            bcp.actualizarEstado("Finalizado");
             return false;
         }
 
@@ -116,11 +133,11 @@ public class CPU {
             PC++;
         }
 
-        bcp.avanzarContador();
+        //bcp.avanzarContador();
         bcp.actualizarRegistros(PC, AC, AX, BX, CX, DX);
 
         if (esFinDePrograma(actual)) {
-            bcp.actualizarEstado("Terminado");
+            bcp.actualizarEstado("Finalizado");
             return false;
         }
 
@@ -141,7 +158,7 @@ public class CPU {
         esperandoEntrada = false;
 
         PC++;
-        bcp.avanzarContador();
+        //bcp.avanzarContador();
         bcp.actualizarRegistros(PC, AC, AX, BX, CX, DX);
     }
 

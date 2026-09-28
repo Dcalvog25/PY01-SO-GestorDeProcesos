@@ -1,171 +1,176 @@
 package com.minipc.t1sominipc.model;
 
 /**
- * BCP (Base Control Process) representa el proceso en ejecución.
+ * BCP (Bloque de Control de Proceso). Cada instancia vive en su propio
+ * segmento de memoria de kernel, indicado por direccionBase.
  */
-
 public class BCP {
 
-    private static final int POS_PID = 0;
-    private static final int POS_ESTADO = 1;
-    private static final int POS_PC = 2;
-    private static final int POS_AC = 3;
-    private static final int POS_AX = 4;
-    private static final int POS_BX = 5;
-    private static final int POS_CX = 6;
-    private static final int POS_DX = 7;
-    private static final int POS_BASE = 8;
-    private static final int POS_CONTADOR = 9;
-    private static final int POS_PILA = 10;
-    private static final int TAM_BCP = 15; 
+    private static final int PID = 0;
+    private static final int ESTADO = 1;
+    private static final int PC = 2;
+    private static final int AC = 3;
+    private static final int AX = 4;
+    private static final int BX = 5;
+    private static final int CX = 6;
+    private static final int DX = 7;
+    private static final int BASE = 8;
+    private static final int TAMANO = 9;       // NUEVO: Alcance
+    private static final int PRIORIDAD = 10;   // NUEVO
+    private static final int TIEMPO_INICIO = 11;   // NUEVO
+    private static final int TIEMPO_EMPLEADO = 12; // NUEVO
+    private static final int ARCHIVOS_ABIERTOS = 13; // NUEVO: cantidad, simplificado
+    private static final int SIGUIENTE_BCP = 14;   // NUEVO: dirección del próximo BCP, -1 si no hay
+    private static final int PILA = 15;
+
+    private static final int TAM_BCP = PILA + PilaBCP.getTamanoFijo(); // 15 + 5 = 21
 
     private Memoria memoria;
+    private int direccionBase;
     private PilaBCP pila;
 
-    /*
-     * El BCP se almacena en la memoria, en una posición específica.
-     * Cada campo del BCP ocupa una posición en la memoria.
-     */
-
-    public BCP(Memoria memoria, int pid, int baseUsuario) {
+    public BCP(Memoria memoria, int direccionBase, int pid, int baseUsuario, int tamanoPrograma, int prioridad) {
         this.memoria = memoria;
+        this.direccionBase = direccionBase;
 
-        if(TAM_BCP - 1 > memoria.getFinMemoriaKernel()) {
-            throw new IllegalArgumentException("La memoria es demasiado pequeña para almacenar el BCP.");
+        if (direccionBase + TAM_BCP - 1 > memoria.getFinMemoriaKernel()) {
+            throw new IllegalArgumentException("El BCP no cabe en el segmento de kernel.");
         }
-        memoria.escribir(POS_PID, pid, "PID");
-        memoria.escribir(POS_ESTADO, 0, "Estado"); // 0 = Nuevo
-        memoria.escribir(POS_PC, baseUsuario, "PC");
-        memoria.escribir(POS_AC, 0, "AC");
-        memoria.escribir(POS_AX, 0, "AX");
-        memoria.escribir(POS_BX, 0, "BX");
-        memoria.escribir(POS_CX, 0, "CX");
-        memoria.escribir(POS_DX, 0, "DX");
-        memoria.escribir(POS_BASE, baseUsuario, "Base");
-        memoria.escribir(POS_CONTADOR, 0, "Contador");
-        pila = new PilaBCP(memoria, POS_PILA);
+
+        memoria.escribir(direccionBase + PID, pid, "PID");
+        memoria.escribir(direccionBase + ESTADO, 0, "Estado"); // 0 = Nuevo
+        memoria.escribir(direccionBase + PC, baseUsuario, "PC");
+        memoria.escribir(direccionBase + AC, 0, "AC");
+        memoria.escribir(direccionBase + AX, 0, "AX");
+        memoria.escribir(direccionBase + BX, 0, "BX");
+        memoria.escribir(direccionBase + CX, 0, "CX");
+        memoria.escribir(direccionBase + DX, 0, "DX");
+        memoria.escribir(direccionBase + BASE, baseUsuario, "Base");
+        memoria.escribir(direccionBase + TAMANO, tamanoPrograma, "Tamano");
+        memoria.escribir(direccionBase + PRIORIDAD, prioridad, "Prioridad");
+        memoria.escribir(direccionBase + TIEMPO_INICIO, 0, "TiempoInicio");
+        memoria.escribir(direccionBase + TIEMPO_EMPLEADO, 0, "TiempoEmpleado");
+        memoria.escribir(direccionBase + ARCHIVOS_ABIERTOS, 0, "ArchivosAbiertos");
+        memoria.escribir(direccionBase + SIGUIENTE_BCP, -1, "SiguienteBCP");
+
+        this.pila = new PilaBCP(memoria, direccionBase + PILA);
     }
 
     public PilaBCP getPila() {
         return pila;
     }
 
-    /*
-        * Nombre: actualizarRegistros
-        *Entrada: int pc, int ac, int ax, int bx, int cx, int dx
-        *Salida: void
-        *Descripción: Actualiza los registros del BCP en la memoria con los valores proporcionados.
-     */
-    public void actualizarRegistros(int pc, int ac, int ax, int bx, int cx, int dx) {
-        memoria.escribir(POS_PC, pc, "PC");
-        memoria.escribir(POS_AC, ac, "AC");
-        memoria.escribir(POS_AX, ax, "AX");
-        memoria.escribir(POS_BX, bx, "BX");
-        memoria.escribir(POS_CX, cx, "CX");
-        memoria.escribir(POS_DX, dx, "DX");
+    public int getDireccionBase() {
+        return direccionBase;
     }
 
+    public static int getTamanoBCP() {
+        return TAM_BCP;
+    }
 
-    /*
-        * Nombre: actualizarEstado
-        *Entrada: String estado
-        *Salida: void
-        *Descripción: Actualiza el estado del BCP en la memoria con el valor proporcionado.
-     */
+    public void actualizarRegistros(int pc, int ac, int ax, int bx, int cx, int dx) {
+        memoria.escribir(direccionBase + PC, pc, "PC");
+        memoria.escribir(direccionBase + AC, ac, "AC");
+        memoria.escribir(direccionBase + AX, ax, "AX");
+        memoria.escribir(direccionBase + BX, bx, "BX");
+        memoria.escribir(direccionBase + CX, cx, "CX");
+        memoria.escribir(direccionBase + DX, dx, "DX");
+    }
+
+    public int getPC() { 
+        return memoria.leer(direccionBase + PC); 
+    }
+    public int getAC() { 
+        return memoria.leer(direccionBase + AC); 
+    }
+    public int getAX() { 
+        return memoria.leer(direccionBase + AX); 
+    }
+    public int getBX() { 
+        return memoria.leer(direccionBase + BX); 
+    }
+    public int getCX() { 
+        return memoria.leer(direccionBase + CX); 
+    }
+    public int getDX() { 
+        return memoria.leer(direccionBase + DX); 
+    }
+    public int getBase() { 
+        return memoria.leer(direccionBase + BASE); 
+    }
+    public int getTamano() { 
+        return memoria.leer(direccionBase + TAMANO); 
+    }
+    public int getPrioridad() { 
+        return memoria.leer(direccionBase + PRIORIDAD); 
+    }
+    public int getPID() { 
+        return memoria.leer(direccionBase + PID); 
+    }
 
     public void actualizarEstado(String estado) {
-        memoria.escribir(POS_ESTADO, estadoACodigo(estado), "Estado");
+        memoria.escribir(direccionBase + ESTADO, estadoACodigo(estado), "Estado");
     }
 
-    /*
-        * Nombre: avanzarContador
-        *Entrada: void
-        *Salida: void
-        *Descripción: Incrementa el contador de instrucciones del BCP en la memoria.
-     */
-    public void avanzarContador() {
-        int actual = memoria.leer(POS_CONTADOR);
-        memoria.escribir(POS_CONTADOR, actual + 1, "Contador");
-    }
-
-    /*
-        * Nombre: getContadorInstrucciones
-        *Entrada: void
-        *Salida: int
-        *Descripción: Devuelve el valor del contador de instrucciones del BCP desde la memoria.
-     */
-    public int getContadorInstrucciones() {
-        return memoria.leer(POS_CONTADOR);
-    }
-
-    /*
-        * Nombre: getEstado
-        *Entrada: void
-        *Salida: String
-        *Descripción: Devuelve el estado del BCP desde la memoria.
-     */
     public String getEstado() {
-        return codigoAEstado(memoria.leer(POS_ESTADO));
-    }
-   
-    /*
-        * Nombre: reiniciar
-        *Entrada: int baseUsuario
-        *Salida: void
-        *Descripción: Reinicia el BCP en la memoria con los valores iniciales.
-     */
-    public void reiniciar(int baseUsuario) {
-        memoria.escribir(POS_ESTADO, 1, "Estado");   // 1 = Listo directamente
-        memoria.escribir(POS_PC, baseUsuario, "PC");
-        memoria.escribir(POS_AC, 0, "AC");
-        memoria.escribir(POS_AX, 0, "AX");
-        memoria.escribir(POS_BX, 0, "BX");
-        memoria.escribir(POS_CX, 0, "CX");
-        memoria.escribir(POS_DX, 0, "DX");
-        memoria.escribir(POS_BASE, baseUsuario, "Base");
-        memoria.escribir(POS_CONTADOR, 0, "Contador");
+        return codigoAEstado(memoria.leer(direccionBase + ESTADO));
     }
 
-    /*
-        * Nombre: estadoACodigo
-        *Entrada: String estado
-        *Salida: int
-        *Descripción: Convierte un estado en su código correspondiente.
-     */
+    /* 
+    public void avanzarContador() {
+        int actual = memoria.leer(direccionBase + CONTADOR);
+        memoria.escribir(direccionBase + CONTADOR, actual + 1, "Contador");
+    }
+
+    public int getContadorInstrucciones() {
+        return memoria.leer(direccionBase + CONTADOR);
+    }
+    */
+
+    public void setSiguienteBCP(int direccion) {
+        memoria.escribir(direccionBase + SIGUIENTE_BCP, direccion, "SiguienteBCP");
+    }
+
+    public int getSiguienteBCP() {
+        return memoria.leer(direccionBase + SIGUIENTE_BCP);
+    }
+
+    public void registrarInicio(long tiempoActual) {
+        memoria.escribir(direccionBase + TIEMPO_INICIO, (int) tiempoActual, "TiempoInicio");
+    }
+
+    public void registrarTiempoEmpleado(long tiempoTotal) {
+        memoria.escribir(direccionBase + TIEMPO_EMPLEADO, (int) tiempoTotal, "TiempoEmpleado");
+    }
+
+    public int getTiempoInicio() { 
+        return memoria.leer(direccionBase + TIEMPO_INICIO); 
+    }
+    public int getTiempoEmpleado() { 
+        return memoria.leer(direccionBase + TIEMPO_EMPLEADO); 
+    }
+
     private int estadoACodigo(String estado) {
         switch (estado) {
-            case "Nuevo": 
-                return 0;
-            case "Listo": 
-                return 1;
-            case "Ejecutando": 
-                return 2;
-            case "Terminado": 
-                return 3;
-            default: 
-                throw new IllegalArgumentException("Estado no reconocido: " + estado);
+            case "Nuevo": return 0;
+            case "Preparado": return 1;
+            case "Ejecutando": return 2;
+            case "Suspendido": return 3;
+            case "EnEspera": return 4;
+            case "Finalizado": return 5;
+            default: throw new IllegalArgumentException("Estado no reconocido: " + estado);
         }
     }
 
-    /*
-        * Nombre: codigoAEstado
-        *Entrada: int codigo
-        *Salida: String
-        *Descripción: Convierte un código en su estado correspondiente.
-     */
-
     private String codigoAEstado(int codigo) {
         switch (codigo) {
-            case 0: 
-                return "Nuevo";
-            case 1: 
-                return "Listo";
-            case 2: 
-                return "Ejecutando";
-            case 3: 
-                return "Terminado";
-            default: 
-                return "Desconocido";
+            case 0: return "Nuevo";
+            case 1: return "Preparado";
+            case 2: return "Ejecutando";
+            case 3: return "Suspendido";
+            case 4: return "EnEspera";
+            case 5: return "Finalizado";
+            default: return "Desconocido";
         }
     }
 }
