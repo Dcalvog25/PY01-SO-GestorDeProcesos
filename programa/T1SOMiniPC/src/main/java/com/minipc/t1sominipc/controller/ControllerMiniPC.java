@@ -224,6 +224,11 @@ public class ControllerMiniPC {
         boolean continua = cpu.paso(); // internamente ya pone "Ejecutando" antes de correr
         actualizarVista();
 
+        if(cpu.isEsperandoEntrada() ) {
+            avisarEsperandoTeclado();
+            return;
+        }
+
         if (cpu.getUltimoError() != null) {
             JOptionPane.showMessageDialog(vista, cpu.getUltimoError(),
                     "Aviso de ejecución", JOptionPane.WARNING_MESSAGE);
@@ -489,6 +494,8 @@ public class ControllerMiniPC {
         vista.getBtnConfigurarMemoria().setEnabled(true);
         vista.getBtnCargarArchivo().setEnabled(true);
         resetEntradaTeclado();
+        vista.getBtnPasoAPaso().setEnabled(false);
+        vista.getBtnEjecutarTodo().setEnabled(false);
         JOptionPane.showMessageDialog(vista, "Programa terminado",
                 "Ejecución finalizada", JOptionPane.INFORMATION_MESSAGE);
     }

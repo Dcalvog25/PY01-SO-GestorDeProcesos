@@ -90,6 +90,10 @@ public class CPU {
             return true;
         }
 
+        if ("Terminado".equals(bcp.getEstado())) {
+            return false;
+        }
+
         ultimoError = null;
 
         Instruccion actual = memoria.leerInstruccion(PC);
@@ -225,17 +229,17 @@ public class CPU {
                 return false;
 
             case "JMP":
-                return realizarSalto(valor);
+                return realizarSalto(PC + valor);
 
             case "JE":
                 if (banderaIgual) {
-                    return realizarSalto(valor);
+                    return realizarSalto(PC + valor);
                 }
                 return false;
 
             case "JNE":
                 if (!banderaIgual) {
-                    return realizarSalto(valor);
+                    return realizarSalto(PC + valor);
                 }
                 return false;
 
