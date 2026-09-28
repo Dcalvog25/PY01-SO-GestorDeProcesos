@@ -3,6 +3,7 @@ package com.minipc.t1sominipc.controller;
 import com.minipc.t1sominipc.model.BCP;
 import com.minipc.t1sominipc.model.CPU;
 import com.minipc.t1sominipc.model.ConvertidorASM;
+import com.minipc.t1sominipc.model.Disco;
 import com.minipc.t1sominipc.model.Instruccion;
 import com.minipc.t1sominipc.model.Memoria;
 import com.minipc.t1sominipc.model.Pantalla;
@@ -27,6 +28,8 @@ public class ControllerMiniPC {
     private Pantalla pantalla;
     private ConvertidorASM parser;
     private MiniPCFrame vista;
+    private Disco disco;
+    private String nombreProgramaActual;
 
     private List<Instruccion> programaActual;
     private boolean procesoAdmitido = false; // true una vez que ya se escribió a RAM
@@ -57,6 +60,7 @@ public class ControllerMiniPC {
         bcp = new BCP(memoria,  1, memoria.getInicioMemoriaUsuario());
         pantalla = new Pantalla();
         cpu = new CPU(memoria, bcp, pantalla);
+        disco = new Disco(512, 64); // por ahora, estos números pasan a un archivo de configuración luego
         resetEntradaTeclado();
     }
 
@@ -132,9 +136,30 @@ public class ControllerMiniPC {
                 return;
             }
 
+            String nombre = archivo.getName();
+
+            if (disco.existeArchivo(nombre)) {
+                JOptionPane.showMessageDialog(vista,
+                        "Ya hay un archivo llamado '" + nombre + "' en el disco. Usa 'Limpiar / Reset' o cambia el nombre del archivo.",
+                        "Archivo repetido", JOptionPane.WARNING_MESSAGE);
+                programaActual = null;
+                return;
+            }
+
+            if (!disco.guardarArchivo(nombre, programaActual)) {
+                JOptionPane.showMessageDialog(vista,
+                        "No se pudo guardar en disco (sin espacio o índice lleno).",
+                        "Disco lleno", JOptionPane.ERROR_MESSAGE);
+                programaActual = null;
+                return;
+            }
+
+            nombreProgramaActual = nombre;
             bcp.actualizarEstado("Nuevo");
             vista.getLblPID().setText("PID 1");
             vista.getLblEstadoProceso().setText("Preparando memoria para el proceso...");
+            actualizarTablaDisco();
+            actualizarTablaProcesos();
 
             deshabilitarTodosLosBotones();
 
@@ -157,10 +182,13 @@ public class ControllerMiniPC {
      */
     private void completarAdmision() {
         try {
-            cpu.cargarPrograma(programaActual);
+            List<Instruccion> desdeDisco = disco.leerArchivo(nombreProgramaActual);
+            programaActual = desdeDisco;
+            cpu.cargarPrograma(desdeDisco);
             bcp.actualizarEstado("Listo");
-            //actualizarTablaMemoria();
             procesoAdmitido = true;
+            //actualizarTablaMemoria();
+
 
             vista.getBtnPasoAPaso().setEnabled(true);
             vista.getBtnEjecutarTodo().setEnabled(true);
@@ -282,6 +310,7 @@ public class ControllerMiniPC {
     private void limpiarTodo() {
         inicializarMaquina(memoria.getTamanoTotal(), memoria.getInicioMemoriaUsuario());
         programaActual = null;
+        nombreProgramaActual = null;
         procesoAdmitido = false;
         ejecutandoAutomatico = false;
 
@@ -310,6 +339,7 @@ public class ControllerMiniPC {
 
         inicializarMaquina(nuevoTamano, nuevoKernel);
         programaActual = null;
+        nombreProgramaActual = null;
         procesoAdmitido = false;
         ejecutandoAutomatico = false;
 
@@ -520,5 +550,52 @@ public class ControllerMiniPC {
         actualizarTablaMemoria();
         actualizarTablaProcesos();
         actualizarConsola();
+    }
+
+    private void actualizarTablaDisco() {
+        DefaultTableModel modelo = vista.getModeloDisco();
+        modelo.setRowCount(0);
+
+        int cantidad = disco.getCantidadArchivos();
+
+        // Sección 1: índice (2 posiciones por archivo)
+        for (int i = 0; i < cantidad; i++) {
+            int pos = i * 2;
+            modelo.addRow(new Object[]{pos + "-" + (pos + 1),
+                    "Índice: " + disco.leerNombre(pos) + " -> dir " + disco.leerDato(pos)
+                    + ", tam " + disco.leerDato(pos + 1)});
+        }
+        int inicioLibreIndice = cantidad * 2;
+        int finIndice = disco.getInicioZonaProgramas() - 1;
+        if (inicioLibreIndice <= finIndice) {
+            modelo.addRow(new Object[]{rango(inicioLibreIndice, finIndice), "Índice libre"});
+        }
+
+        // Sección 2: programas
+        for (int i = 0; i < cantidad; i++) {
+            String nombre = disco.leerNombre(i * 2);
+            int direccion = disco.leerDato(i * 2);
+            int tamano = disco.leerDato(i * 2 + 1);
+            for (int j = 0; j < tamano; j++) {
+                modelo.addRow(new Object[]{direccion + j,
+                        nombre + ": " + disco.leerInstruccion(direccion + j).getLineaOriginal()});
+            }
+        }
+        int inicioLibreProg = disco.getSiguienteDireccionLibre();
+        int finProg = disco.getInicioMemoriaVirtual() - 1;
+        if (inicioLibreProg <= finProg) {
+            modelo.addRow(new Object[]{rango(inicioLibreProg, finProg), "Programas libre"});
+        }
+
+        // Sección 3: memoria virtual reservada
+        modelo.addRow(new Object[]{rango(disco.getInicioMemoriaVirtual(), disco.getTamanoTotal() - 1),
+                "Memoria virtual (reservada)"});
+    }
+
+    private String rango(int inicio, int fin) {
+        if (inicio == fin) {
+            return String.valueOf(inicio);
+        }
+        return inicio + "-" + fin;
     }
 }

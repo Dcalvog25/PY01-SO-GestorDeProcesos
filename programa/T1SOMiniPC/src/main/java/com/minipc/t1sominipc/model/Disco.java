@@ -168,4 +168,37 @@ public class Disco {
     public int getEspacioLibre() { 
         return inicioMemoriaVirtual - siguienteDireccionLibre; 
     }
+
+    public int getTamanoTotal() {
+    return tamanoTotal;
+    }
+
+    public int getCantidadArchivos() {
+        return cantidadArchivos;
+    }
+
+    public int getSiguienteDireccionLibre() {
+        return siguienteDireccionLibre;
+    }
+
+    public int leerDato(int direccion) {
+        return datos[direccion];
+    }
+
+    public String leerNombre(int direccion) {
+        return nombresArchivo[direccion];
+    }
+
+    public Instruccion leerInstruccion(int direccion) {
+        return contenido[direccion];
+    }
+
+    public boolean existeArchivo(String nombre) {
+        if(buscarPorNombre(nombre) != -1) {
+            return true;
+        }
+        return false;
+    }
+    
+    
 }
