@@ -218,8 +218,7 @@ public class Memoria {
             if (!direccionValidaUsuario(direccion)) {
                 break;
             }
-            int valorBinario = Integer.parseInt(instr.aBinario(), 2);
-            escribir(direccion, valorBinario, instr.getLineaOriginal());
+            escribir(direccion, 0, instr.getLineaOriginal());
             instrucciones[direccion] = instr;
             direccion++;
         }

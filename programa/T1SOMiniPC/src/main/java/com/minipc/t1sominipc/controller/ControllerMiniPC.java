@@ -5,6 +5,7 @@ import com.minipc.t1sominipc.model.CPU;
 import com.minipc.t1sominipc.model.ConvertidorASM;
 import com.minipc.t1sominipc.model.Instruccion;
 import com.minipc.t1sominipc.model.Memoria;
+import com.minipc.t1sominipc.model.Pantalla;
 import com.minipc.t1sominipc.view.MiniPCFrame;
 
 import javax.swing.*;
@@ -23,11 +24,13 @@ public class ControllerMiniPC {
     private Memoria memoria;
     private BCP bcp;
     private CPU cpu;
+    private Pantalla pantalla;
     private ConvertidorASM parser;
     private MiniPCFrame vista;
 
     private List<Instruccion> programaActual;
     private boolean procesoAdmitido = false; // true una vez que ya se escribió a RAM
+    private boolean ejecutandoAutomatico = false; // true si "Ejecutar Todo" quedó pausado esperando teclado
 
     /*
         * Nombre: ControllerMiniPC
@@ -52,7 +55,9 @@ public class ControllerMiniPC {
     private void inicializarMaquina(int tamanoRAM, int tamanoKernel) {
         memoria = new Memoria(tamanoRAM, tamanoKernel);
         bcp = new BCP(memoria,  1, memoria.getInicioMemoriaUsuario());
-        cpu = new CPU(memoria, bcp);
+        pantalla = new Pantalla();
+        cpu = new CPU(memoria, bcp, pantalla);
+        resetEntradaTeclado();
     }
 
     /*
@@ -67,6 +72,7 @@ public class ControllerMiniPC {
         vista.getBtnEjecutarTodo().addActionListener(e -> ejecutarTodo());
         vista.getBtnLimpiarReset().addActionListener(e -> limpiarTodo());
         vista.getBtnAplicarConfig().addActionListener(e -> aplicarConfiguracion());
+        vista.getTxtEntradaTeclado().addActionListener(e -> procesarEntradaTeclado());
     }
 
     // ===================== CARGA: SOLO RECONOCE, NO TOCA MEMORIA =====================
@@ -126,7 +132,6 @@ public class ControllerMiniPC {
                 return;
             }
 
-            actualizarTablaPrograma();
             bcp.actualizarEstado("Nuevo");
             vista.getLblPID().setText("PID 1");
             vista.getLblEstadoProceso().setText("Preparando memoria para el proceso...");
@@ -170,7 +175,6 @@ public class ControllerMiniPC {
 
             // Revertir todo para que el usuario pueda intentar de nuevo
             programaActual = null;
-            vista.getModeloPrograma().setRowCount(0);
             vista.getLblPID().setText("PID --");
             vista.getLblEstadoProceso().setText("Esperando archivo");
 
@@ -212,14 +216,21 @@ public class ControllerMiniPC {
             return;
         }
 
+        if (cpu.isEsperandoEntrada()) {
+            avisarEsperandoTeclado();
+            return;
+        }
+
         boolean continua = cpu.paso(); // internamente ya pone "Ejecutando" antes de correr
         actualizarVista();
 
-        if (!continua) {
-            vista.getBtnConfigurarMemoria().setEnabled(true);
-            vista.getBtnCargarArchivo().setEnabled(true);
-            JOptionPane.showMessageDialog(vista, "Programa terminado",
-                    "Ejecución finalizada", JOptionPane.INFORMATION_MESSAGE);
+        if (cpu.getUltimoError() != null) {
+            JOptionPane.showMessageDialog(vista, cpu.getUltimoError(),
+                    "Aviso de ejecución", JOptionPane.WARNING_MESSAGE);
+        }
+
+        if (!continua && !cpu.isEsperandoEntrada()) {
+            finalizarEjecucion();
         }
     }
 
@@ -236,13 +247,23 @@ public class ControllerMiniPC {
             return;
         }
 
+        if (cpu.isEsperandoEntrada()) {
+            avisarEsperandoTeclado();
+            return;
+        }
+
         boolean continua = true;
         while (continua) {
             continua = cpu.paso();
+            if (cpu.isEsperandoEntrada()) {
+                ejecutandoAutomatico = true;
+                actualizarVista();
+                avisarEsperandoTeclado();
+                return;
+            }
         }
         actualizarVista();
-        vista.getBtnConfigurarMemoria().setEnabled(true);
-        vista.getBtnCargarArchivo().setEnabled(true);
+        finalizarEjecucion();
     }
 
     // ===================== RESET Y CONFIGURACIÓN =====================
@@ -257,9 +278,10 @@ public class ControllerMiniPC {
         inicializarMaquina(memoria.getTamanoTotal(), memoria.getInicioMemoriaUsuario());
         programaActual = null;
         procesoAdmitido = false;
+        ejecutandoAutomatico = false;
 
-        vista.getModeloPrograma().setRowCount(0);
         vista.getModeloMemoria().setRowCount(0);
+        vista.getModeloProcesos().setRowCount(0);
         vista.getLblPID().setText("PID --");
 
         vista.getBtnCargarArchivo().setEnabled(true);
@@ -284,9 +306,10 @@ public class ControllerMiniPC {
         inicializarMaquina(nuevoTamano, nuevoKernel);
         programaActual = null;
         procesoAdmitido = false;
+        ejecutandoAutomatico = false;
 
-        vista.getModeloPrograma().setRowCount(0);
         vista.getModeloMemoria().setRowCount(0);
+        vista.getModeloProcesos().setRowCount(0);
         vista.getLblPID().setText("PID --");
 
         vista.getBtnCargarArchivo().setEnabled(true);
@@ -311,20 +334,6 @@ public class ControllerMiniPC {
     }
 
     /*
-        * Nombre: actualizarTablaPrograma
-        *Entrada: void
-        *Salida: void
-        *Descripción: Actualiza la tabla del programa.
-     */
-    private void actualizarTablaPrograma() {
-        DefaultTableModel modelo = vista.getModeloPrograma();
-        modelo.setRowCount(0);
-        for (Instruccion instr : programaActual) {
-            modelo.addRow(new Object[]{instr.getLineaOriginal(), formatearBinario(instr.aBinario())});
-        }
-    }
-
-    /*
         * Nombre: actualizarTablaMemoria
         *Entrada: void
         *Salida: void
@@ -344,7 +353,7 @@ public class ControllerMiniPC {
             String label = memoria.getLabel(pos);
 
             if (label != null && !label.isEmpty()) {
-                modelo.addRow(new Object[]{String.valueOf(pos), label, memoria.leer(pos)});
+                modelo.addRow(new Object[]{String.valueOf(pos), label + " = " + memoria.leer(pos)});
                 pos++;
             } else {
                 int inicioLibre = pos;
@@ -353,7 +362,7 @@ public class ControllerMiniPC {
                 }
                 int finLibre = pos - 1;
                 String rango = (inicioLibre == finLibre) ? String.valueOf(inicioLibre) : inicioLibre + "-" + finLibre;
-                modelo.addRow(new Object[]{rango, "Kernel Libre", "-"});
+                modelo.addRow(new Object[]{rango, "Kernel Libre"});
             }
         }
 
@@ -364,8 +373,7 @@ public class ControllerMiniPC {
             for (int direccion = inicioUsuario; direccion < finPrograma; direccion++) {
                 Instruccion instr = memoria.leerInstruccion(direccion);
                 String textoInstr = (instr != null) ? instr.getLineaOriginal() : "";
-                String valorMostrado = formatoValorMemoria(memoria.leer(direccion));
-                modelo.addRow(new Object[]{direccion, textoInstr, valorMostrado});
+                modelo.addRow(new Object[]{direccion, textoInstr});
             }
             posUsuario = finPrograma;
         }
@@ -373,8 +381,116 @@ public class ControllerMiniPC {
         // RESTO USUARIO: espacio libre agrupado en una sola fila
         if (posUsuario <= finTotal) {
             String rango = (posUsuario == finTotal) ? String.valueOf(posUsuario) : posUsuario + "-" + finTotal;
-            modelo.addRow(new Object[]{rango, "Usuario Libre", "-"});
+            modelo.addRow(new Object[]{rango, "Usuario Libre"});
         }
+    }
+
+    /*
+        * Nombre: actualizarTablaProcesos
+        *Entrada: void
+        *Salida: void
+        *Descripción: Actualiza la tabla de la cola de trabajo (por ahora un único proceso).
+     */
+    private void actualizarTablaProcesos() {
+        DefaultTableModel modelo = vista.getModeloProcesos();
+        modelo.setRowCount(0);
+        if (programaActual != null) {
+            modelo.addRow(new Object[]{"PID 1", bcp.getEstado()});
+        }
+    }
+
+    /*
+        * Nombre: actualizarConsola
+        *Entrada: void
+        *Salida: void
+        *Descripción: Vuelca el contenido de la Pantalla en el área de consola.
+     */
+    private void actualizarConsola() {
+        List<String> contenido = pantalla.getContenido();
+        if (contenido.isEmpty()) {
+            vista.getAreaConsola().setText(">> Sistema iniciado correctamente...\n");
+            return;
+        }
+        StringBuilder sb = new StringBuilder();
+        for (String linea : contenido) {
+            sb.append(">> ").append(linea).append("\n");
+        }
+        vista.getAreaConsola().setText(sb.toString());
+    }
+
+    /*
+        * Nombre: procesarEntradaTeclado
+        *Entrada: void
+        *Salida: void
+        *Descripción: Atiende el Enter en el campo de teclado para completar un INT 09H pendiente.
+     */
+    private void procesarEntradaTeclado() {
+        if (!cpu.isEsperandoEntrada()) {
+            return;
+        }
+
+        String texto = vista.getTxtEntradaTeclado().getText().trim();
+        int valor;
+        try {
+            valor = Integer.parseInt(texto);
+        } catch (NumberFormatException ex) {
+            JOptionPane.showMessageDialog(vista, "Ingresa un valor numérico entre 0 y 255.",
+                    "Entrada inválida", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+        if (valor < 0 || valor > 255) {
+            JOptionPane.showMessageDialog(vista, "El valor debe estar entre 0 y 255.",
+                    "Entrada inválida", JOptionPane.ERROR_MESSAGE);
+            return;
+        }
+
+        cpu.recibirEntrada(valor);
+        resetEntradaTeclado();
+        actualizarVista();
+
+        if (ejecutandoAutomatico) {
+            ejecutandoAutomatico = false;
+            ejecutarTodo();
+        }
+    }
+
+    /*
+        * Nombre: avisarEsperandoTeclado
+        *Entrada: void
+        *Salida: void
+        *Descripción: Habilita el campo de teclado y avisa al usuario que hay un INT 09H pendiente.
+     */
+    private void avisarEsperandoTeclado() {
+        vista.getTxtEntradaTeclado().setEnabled(true);
+        vista.getTxtEntradaTeclado().requestFocusInWindow();
+        JOptionPane.showMessageDialog(vista,
+                "El programa está esperando un valor de teclado (INT 09H).\nIngresa un número entre 0 y 255 y presiona Enter.",
+                "Esperando entrada", JOptionPane.WARNING_MESSAGE);
+    }
+
+    /*
+        * Nombre: resetEntradaTeclado
+        *Entrada: void
+        *Salida: void
+        *Descripción: Limpia y deshabilita el campo de teclado hasta que se necesite de nuevo.
+     */
+    private void resetEntradaTeclado() {
+        vista.getTxtEntradaTeclado().setText("");
+        vista.getTxtEntradaTeclado().setEnabled(false);
+    }
+
+    /*
+        * Nombre: finalizarEjecucion
+        *Entrada: void
+        *Salida: void
+        *Descripción: Restaura los botones cuando el programa terminó (INT 20H).
+     */
+    private void finalizarEjecucion() {
+        vista.getBtnConfigurarMemoria().setEnabled(true);
+        vista.getBtnCargarArchivo().setEnabled(true);
+        resetEntradaTeclado();
+        JOptionPane.showMessageDialog(vista, "Programa terminado",
+                "Ejecución finalizada", JOptionPane.INFORMATION_MESSAGE);
     }
 
     /*
@@ -386,7 +502,7 @@ public class ControllerMiniPC {
 
     private void actualizarVista() {
         vista.getLblPC().setText(String.valueOf(cpu.getPC()));
-        vista.getLblIR().setText(cpu.getIRBinario());
+        vista.getLblIR().setText(cpu.getIR());
         vista.getLblAC().setText(String.valueOf(cpu.getAC()));
         vista.getLblAX().setText(String.valueOf(cpu.getAX()));
         vista.getLblBX().setText(String.valueOf(cpu.getBX()));
@@ -395,34 +511,7 @@ public class ControllerMiniPC {
         vista.getLblEstadoProceso().setText(bcp.getEstado());
 
         actualizarTablaMemoria();
-    }
-
-    /*
-        * Nombre: formatearBinario
-        *Entrada: String binario
-        *Salida: String
-        *Descripción: Formatea un número binario para su visualización.
-     */
-
-    private String formatearBinario(String binario) {
-        StringBuilder sb = new StringBuilder();
-        for (int i = 0; i < binario.length(); i++) {
-            sb.append(binario.charAt(i));
-            if ((i == 3 || i == 7) && i != binario.length() - 1) {
-                sb.append(" ");
-            }
-        }
-        return sb.toString();
-    }
-
-    /*
-        * Nombre: formatoValorMemoria
-        *Entrada: int valor
-        *Salida: String
-        *Descripción: Formatea un valor de memoria para su visualización.
-     */
-    private String formatoValorMemoria(int valor) {
-        String binario = String.format("%16s", Integer.toBinaryString(valor)).replace(' ', '0');
-        return formatearBinario(binario);
+        actualizarTablaProcesos();
+        actualizarConsola();
     }
 }
