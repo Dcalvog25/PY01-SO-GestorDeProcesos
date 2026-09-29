@@ -23,6 +23,7 @@ public class Memoria {
     private int finMemoriaKernel;
     private int inicioMemoriaUsuario;
     private Instruccion[] instrucciones;
+    private int siguienteDireccionLibreUsuario;
     
     /*
         * Nombre: Memoria
@@ -204,16 +205,16 @@ public class Memoria {
     
     /*
         * Nombre: cargarPrograma
-        *Entrada: List<Instruccion> programa
+        *Entrada: List<Instruccion> programa, int direccionBase
         *Salida: void
         *Descripción: Carga un programa en la memoria.
      */
-    public void cargarPrograma(List<Instruccion> programa) {
+    public void cargarPrograma(List<Instruccion> programa, int direccionBase) {
 
         if(programa.size() > (tamanoTotal - inicioMemoriaUsuario)){
             throw new IllegalArgumentException("El programa es demasiado grande para la memoria de usuario.");
         }
-        int direccion = inicioMemoriaUsuario;
+        int direccion = direccionBase;
         for (Instruccion instr : programa) {
             if (!direccionValidaUsuario(direccion)) {
                 break;
@@ -235,5 +236,18 @@ public class Memoria {
             return null; // Dirección inválida
         }
         return instrucciones[direccion];
+    }
+
+    public int asignarBloque(int tamano) {
+        if (siguienteDireccionLibreUsuario + tamano > tamanoTotal) {
+            return -1; // no cabe
+        }
+        int base = siguienteDireccionLibreUsuario;
+        siguienteDireccionLibreUsuario += tamano;
+        return base;
+    }
+
+    public int getEspacioLibreUsuario() {
+        return tamanoTotal - siguienteDireccionLibreUsuario;
     }
 }

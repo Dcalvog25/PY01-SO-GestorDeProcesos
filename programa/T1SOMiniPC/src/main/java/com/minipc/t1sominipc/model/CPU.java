@@ -69,7 +69,7 @@ public class CPU {
         * Descripcion: Carga un programa en la memoria y reinicia los registros de la CPU.
         * Entrada: List<Instruccion> programa
         * Salida: void
-     */
+    
     public void cargarPrograma(List<Instruccion> programa) {
         memoria.limpiarMemoriaUsuario();
         memoria.cargarPrograma(programa);
@@ -77,6 +77,8 @@ public class CPU {
         inicializarRegistros();
         //bcp.reiniciar(memoria.getInicioMemoriaUsuario());
     }
+
+    */ 
 
     /*
         * Nombre: asignarProceso
@@ -93,6 +95,8 @@ public class CPU {
         this.AC = nuevoBcp.getAC();
         this.PC = nuevoBcp.getPC();
         this.programaActualTamano = nuevoBcp.getTamano();
+        this.IR = "";
+        this.ultimoError = null;
     }
 
     /*
@@ -304,18 +308,17 @@ public class CPU {
     */
 
     private boolean realizarSalto(int direccionDestino) {
-        int inicio = memoria.getInicioMemoriaUsuario();
-        int fin = inicio + programaActualTamano - 1; 
+        int inicio = bcp.getBase();
+        int fin = inicio + programaActualTamano - 1;
 
         if (direccionDestino < inicio || direccionDestino > fin) {
             ultimoError = "Salto fuera de rango del programa: intentó ir a la posición " + direccionDestino;
-            return false; // no saltamos, dejamos que PC++ siga su curso normal
+            return false;
         }
 
         PC = direccionDestino;
         return true;
     }
-
     /*
         * Nombre: ejecutarInterrupcion
         * Descripción: INT 20H termina el programa (se detecta en esFinDePrograma).

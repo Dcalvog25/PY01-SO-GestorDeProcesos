@@ -7,6 +7,7 @@ import com.minipc.t1sominipc.model.Disco;
 import com.minipc.t1sominipc.model.Instruccion;
 import com.minipc.t1sominipc.model.Memoria;
 import com.minipc.t1sominipc.model.Pantalla;
+import com.minipc.t1sominipc.model.Planificador;
 import com.minipc.t1sominipc.view.MiniPCFrame;
 
 import javax.swing.*;
@@ -29,6 +30,7 @@ public class ControllerMiniPC {
     private ConvertidorASM parser;
     private MiniPCFrame vista;
     private Disco disco;
+    private Planificador planificador;
     private String nombreProgramaActual;
 
     private List<Instruccion> programaActual;
@@ -62,6 +64,8 @@ public class ControllerMiniPC {
         pantalla = new Pantalla();
         cpu = new CPU(memoria, pantalla);
         disco = new Disco(512, 64); // por ahora, estos números pasan a un archivo de configuración luego
+        planificador = new Planificador(memoria,disco);
+
         resetEntradaTeclado();
     }
 
@@ -182,39 +186,33 @@ public class ControllerMiniPC {
         *Descripción: Completa el proceso de admisión del programa.
      */
     private void completarAdmision() {
-        try {
-            List<Instruccion> desdeDisco = disco.leerArchivo(nombreProgramaActual);
-            programaActual = desdeDisco;
+        BCP bcpAdmitido = planificador.solicitarAdmision(nombreProgramaActual);
 
-            bcp = new BCP(memoria, 0, 1, memoria.getInicioMemoriaUsuario(), desdeDisco.size(), 0);
-            cpu.asignarProceso(bcp); // en vez de que CPU ya lo tuviera fijo
-            cpu.cargarPrograma(desdeDisco);
-            bcp.actualizarEstado("Preparado");
-            procesoAdmitido = true;
-            //actualizarTablaMemoria();
-
-
-            vista.getBtnPasoAPaso().setEnabled(true);
-            vista.getBtnEjecutarTodo().setEnabled(true);
-            vista.getBtnLimpiarReset().setEnabled(true);
-
-            actualizarVista();
-
-        } catch (IllegalArgumentException ex) {
-            JOptionPane.showMessageDialog(vista,
-                    "No se pudo cargar el programa a memoria: " + ex.getMessage(),
-                    "Error de admisión", JOptionPane.ERROR_MESSAGE);
-
-            // Revertir todo para que el usuario pueda intentar de nuevo
-            programaActual = null;
-            vista.getLblPID().setText("PID --");
-            vista.getLblEstadoProceso().setText("Esperando archivo");
-
+        if (bcpAdmitido == null) {
+            // No cabe ahora mismo: quedó en cola de espera dentro del Planificador
+            vista.getLblEstadoProceso().setText("En espera (sin memoria disponible)");
             vista.getBtnCargarArchivo().setEnabled(true);
             vista.getBtnConfigurarMemoria().setEnabled(true);
             vista.getBtnLimpiarReset().setEnabled(true);
-            
+            actualizarVista();
+
+            JOptionPane.showMessageDialog(vista,
+                    "No hay espacio disponible ahora mismo. El proceso quedó en cola de espera "
+                    + "y se admitirá automáticamente cuando otro proceso termine.",
+                    "En espera", JOptionPane.INFORMATION_MESSAGE);
+            return;
         }
+
+        bcp = bcpAdmitido;
+        programaActual = disco.leerArchivo(nombreProgramaActual);
+        cpu.asignarProceso(bcp);
+        procesoAdmitido = true;
+
+        vista.getBtnPasoAPaso().setEnabled(true);
+        vista.getBtnEjecutarTodo().setEnabled(true);
+        vista.getBtnLimpiarReset().setEnabled(true);
+
+        actualizarVista();
     }
 
     /*
