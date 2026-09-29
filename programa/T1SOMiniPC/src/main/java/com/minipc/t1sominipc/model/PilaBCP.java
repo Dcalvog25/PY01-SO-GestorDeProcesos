@@ -12,6 +12,10 @@ public class PilaBCP {
         this.memoria = memoria;
         this.direccionBase = direccionBase;
         this.cont = -1;
+
+        for (int i = 0; i < tamanoFijo; i++) {
+            memoria.escribir(direccionBase + i, 0, "Pila Libre");
+        }
     }
 
     public boolean push(int valor) {
