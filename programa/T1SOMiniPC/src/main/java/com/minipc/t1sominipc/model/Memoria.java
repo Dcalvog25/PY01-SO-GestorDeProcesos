@@ -50,6 +50,7 @@ public class Memoria {
         this.memoria = new int[tamanoTotal];
         this.memoriaLabels = new String[tamanoTotal];
         this.instrucciones = new Instruccion[tamanoTotal];
+        this.siguienteDireccionLibreUsuario = tamanoKernel; // para no invadir el kernel
         
         for (int i = 0; i < tamanoTotal; i++) {
             memoria[i] = 0; 

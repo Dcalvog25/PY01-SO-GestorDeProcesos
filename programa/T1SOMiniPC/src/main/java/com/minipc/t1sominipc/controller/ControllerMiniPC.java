@@ -4,6 +4,7 @@ import com.minipc.t1sominipc.model.BCP;
 import com.minipc.t1sominipc.model.CPU;
 import com.minipc.t1sominipc.model.ConvertidorASM;
 import com.minipc.t1sominipc.model.Disco;
+import com.minipc.t1sominipc.model.Dispatcher;
 import com.minipc.t1sominipc.model.Instruccion;
 import com.minipc.t1sominipc.model.Memoria;
 import com.minipc.t1sominipc.model.Pantalla;
@@ -16,6 +17,7 @@ import javax.swing.table.DefaultTableModel;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -24,17 +26,17 @@ import java.util.List;
 public class ControllerMiniPC {
 
     private Memoria memoria;
-    private BCP bcp;
+    private BCP bcp; // proceso actualmente asignado a la CPU (puede ser null si no hay ninguno)
     private CPU cpu;
     private Pantalla pantalla;
     private ConvertidorASM parser;
     private MiniPCFrame vista;
     private Disco disco;
     private Planificador planificador;
-    private String nombreProgramaActual;
+    private Dispatcher dispatcher;
 
-    private List<Instruccion> programaActual;
-    private boolean procesoAdmitido = false; // true una vez que ya se escribió a RAM
+    // Historial de todos los BCP admitidos (se conservan aun después de "Finalizado" para mostrarlos en las tablas)
+    private List<BCP> historialProcesos = new ArrayList<>();
     private boolean ejecutandoAutomatico = false; // true si "Ejecutar Todo" quedó pausado esperando teclado
 
     /*
@@ -59,12 +61,12 @@ public class ControllerMiniPC {
      */
     private void inicializarMaquina(int tamanoRAM, int tamanoKernel) {
         memoria = new Memoria(tamanoRAM, tamanoKernel);
-       // bcp = new BCP(memoria,  1, memoria.getInicioMemoriaUsuario());
-        bcp = null; // inicializa bcp como null hasta que se cargue un programa
+        bcp = null; // sin proceso en CPU hasta que se admita alguno
         pantalla = new Pantalla();
         cpu = new CPU(memoria, pantalla);
-        disco = new Disco(512, 64); // por ahora, estos números pasan a un archivo de configuración luego
+        disco = new Disco(512, 64); 
         planificador = new Planificador(memoria,disco);
+        dispatcher = new Dispatcher();
 
         resetEntradaTeclado();
     }
@@ -84,149 +86,156 @@ public class ControllerMiniPC {
         vista.getTxtEntradaTeclado().addActionListener(e -> procesarEntradaTeclado());
     }
 
-    // ===================== CARGA: SOLO RECONOCE, NO TOCA MEMORIA =====================
+    // ===================== CARGA: VALIDA, GUARDA EN DISCO Y ADMITE (FCFS) =====================
 
     /*
         * Nombre: cargarArchivo
         *Entrada: void
         *Salida: void
-        *Descripción: Carga un archivo ASM, lo convierte a instrucciones y maneja errores de validación.
+        *Descripción: Permite seleccionar uno o varios archivos .asm, valida cada uno,
+        * los guarda en Disco y dispara la admisión de los que sean válidos.
      */
     private void cargarArchivo() {
-        if (procesoHayQueResetear()) {
-            JOptionPane.showMessageDialog(vista,
-                    "Hay un proceso activo. Da clic en 'Limpiar / Reset' antes de cargar otro archivo.",
-                    "Proceso en curso", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
         JFileChooser chooser = new JFileChooser();
         chooser.setFileFilter(new FileNameExtensionFilter("Archivos ASM", "asm"));
+        chooser.setMultiSelectionEnabled(true);
         int resultado = chooser.showOpenDialog(vista);
 
         if (resultado != JFileChooser.APPROVE_OPTION) {
             return;
         }
 
-        File archivo = chooser.getSelectedFile();
+        File[] archivos = chooser.getSelectedFiles();
+        List<String> nombresAceptados = new ArrayList<>();
+        StringBuilder erroresGlobales = new StringBuilder();
 
-        try {
-            List<String> lineas = Files.readAllLines(archivo.toPath());
-            programaActual = parser.convertirASM(lineas);
-
-            if (parser.tieneErrores()) {
-                String mensaje = "ARCHIVO NO ES PERMITIDO POR ERRORES\n\n"
-                        + String.join("\n", parser.getErrores());
-                JOptionPane.showMessageDialog(vista, mensaje,
-                        "Archivo rechazado", JOptionPane.ERROR_MESSAGE);
-                programaActual = null;
-                return; // no se carga nada
+        for (File archivo : archivos) {
+            String error = validarYGuardarArchivo(archivo);
+            if (error != null) {
+                erroresGlobales.append(error).append("\n\n");
+            } else {
+                nombresAceptados.add(archivo.getName());
             }
-
-            if (programaActual.isEmpty()) {
-                JOptionPane.showMessageDialog(vista,
-                        "El archivo no contiene ninguna instrucción.",
-                        "Archivo vacío", JOptionPane.ERROR_MESSAGE);
-                programaActual = null;
-                return;
-            }
-
-            int espacioDisponible = memoria.getTamanoTotal() - memoria.getInicioMemoriaUsuario();
-            if (programaActual.size() > espacioDisponible) {
-                JOptionPane.showMessageDialog(vista,
-                        "El programa tiene " + programaActual.size() + " instrucciones, pero solo hay "
-                        + espacioDisponible + " posiciones de memoria de usuario disponibles.",
-                        "Programa demasiado grande", JOptionPane.ERROR_MESSAGE);
-                programaActual = null;
-                return;
-            }
-
-            String nombre = archivo.getName();
-
-            if (disco.existeArchivo(nombre)) {
-                JOptionPane.showMessageDialog(vista,
-                        "Ya hay un archivo llamado '" + nombre + "' en el disco. Usa 'Limpiar / Reset' o cambia el nombre del archivo.",
-                        "Archivo repetido", JOptionPane.WARNING_MESSAGE);
-                programaActual = null;
-                return;
-            }
-
-            if (!disco.guardarArchivo(nombre, programaActual)) {
-                JOptionPane.showMessageDialog(vista,
-                        "No se pudo guardar en disco (sin espacio o índice lleno).",
-                        "Disco lleno", JOptionPane.ERROR_MESSAGE);
-                programaActual = null;
-                return;
-            }
-
-            nombreProgramaActual = nombre;
-            //bcp.actualizarEstado("Nuevo");
-            vista.getLblPID().setText("PID 1");
-            vista.getLblEstadoProceso().setText("Preparando memoria para el proceso...");
-            actualizarTablaDisco();
-            actualizarTablaProcesos();
-
-            deshabilitarTodosLosBotones();
-
-            Timer timerAdmision = new Timer(1200, e -> completarAdmision());
-            timerAdmision.setRepeats(false);
-            timerAdmision.start();
-
-        } catch (IOException ex) {
-            JOptionPane.showMessageDialog(vista,
-                    "No se pudo leer el archivo: " + ex.getMessage(),
-                    "Error", JOptionPane.ERROR_MESSAGE);
         }
+
+        if (erroresGlobales.length() > 0) {
+            JOptionPane.showMessageDialog(vista, erroresGlobales.toString().trim(),
+                    "Algunos archivos fueron rechazados", JOptionPane.WARNING_MESSAGE);
+        }
+
+        if (nombresAceptados.isEmpty()) {
+            return;
+        }
+
+        actualizarTablaDisco();
+        admitirProcesos(nombresAceptados);
+    }
+
+    /*
+        * Nombre: validarYGuardarArchivo
+        *Entrada: File archivo
+        *Salida: String - null si se guardó correctamente, o un mensaje de error para mostrar al usuario
+        *Descripción: Convierte el .asm a instrucciones, valida sintaxis/tamaño/duplicados y lo guarda en Disco.
+     */
+    private String validarYGuardarArchivo(File archivo) {
+        List<String> lineas;
+        try {
+            lineas = Files.readAllLines(archivo.toPath());
+        } catch (IOException ex) {
+            return archivo.getName() + ": no se pudo leer (" + ex.getMessage() + ")";
+        }
+
+        List<Instruccion> programa = parser.convertirASM(lineas);
+
+        if (parser.tieneErrores()) {
+            return archivo.getName() + ":\n" + String.join("\n", parser.getErrores());
+        }
+
+        if (programa.isEmpty()) {
+            return archivo.getName() + ": el archivo no contiene ninguna instrucción.";
+        }
+
+        int espacioMaximoUsuario = memoria.getTamanoTotal() - memoria.getInicioMemoriaUsuario();
+        if (programa.size() > espacioMaximoUsuario) {
+            return archivo.getName() + ": tiene " + programa.size() + " instrucciones, pero la memoria de "
+                    + "usuario solo tiene " + espacioMaximoUsuario + " posiciones en total.";
+        }
+
+        String nombre = archivo.getName();
+        if (disco.existeArchivo(nombre)) {
+            return nombre + ": ya hay un archivo con ese nombre en el disco.";
+        }
+
+        if (!disco.guardarArchivo(nombre, programa)) {
+            return nombre + ": no se pudo guardar en disco (sin espacio o índice lleno).";
+        }
+
+        return null;
+    }
+
+    /*
+        * Nombre: admitirProcesos
+        *Entrada: List<String> nombresArchivos
+        *Salida: void
+        *Descripción: Simula el tiempo de admisión (preparar memoria) para un lote de archivos
+        * ya guardados en Disco, y luego los entrega al Planificador.
+     */
+    private void admitirProcesos(List<String> nombresArchivos) {
+        vista.getBtnPasoAPaso().setEnabled(false);
+        vista.getBtnEjecutarTodo().setEnabled(false);
+        vista.getLblEstadoProceso().setText("Preparando memoria para " + nombresArchivos.size() + " proceso(s)...");
+
+        Timer timerAdmision = new Timer(1200, e -> completarAdmision(nombresArchivos));
+        timerAdmision.setRepeats(false);
+        timerAdmision.start();
     }
 
     /*
         * Nombre: completarAdmision
-        *Entrada: void
+        *Entrada: List<String> nombresArchivos
         *Salida: void
-        *Descripción: Completa el proceso de admisión del programa.
+        *Descripción: Solicita al Planificador la admisión (FCFS) de cada archivo del lote.
+        * Los que no quepan quedan en la cola de espera del Planificador. Si la CPU está libre,
+        * despacha de inmediato al primer proceso "Preparado".
      */
-    private void completarAdmision() {
-        BCP bcpAdmitido = planificador.solicitarAdmision(nombreProgramaActual);
-
-        if (bcpAdmitido == null) {
-            // No cabe ahora mismo: quedó en cola de espera dentro del Planificador
-            vista.getLblEstadoProceso().setText("En espera (sin memoria disponible)");
-            vista.getBtnCargarArchivo().setEnabled(true);
-            vista.getBtnConfigurarMemoria().setEnabled(true);
-            vista.getBtnLimpiarReset().setEnabled(true);
-            actualizarVista();
-
-            JOptionPane.showMessageDialog(vista,
-                    "No hay espacio disponible ahora mismo. El proceso quedó en cola de espera "
-                    + "y se admitirá automáticamente cuando otro proceso termine.",
-                    "En espera", JOptionPane.INFORMATION_MESSAGE);
-            return;
+    private void completarAdmision(List<String> nombresArchivos) {
+        for (String nombre : nombresArchivos) {
+            BCP admitido = planificador.solicitarAdmision(nombre);
+            if (admitido != null) {
+                historialProcesos.add(admitido);
+            }
         }
 
-        bcp = bcpAdmitido;
-        programaActual = disco.leerArchivo(nombreProgramaActual);
-        cpu.asignarProceso(bcp);
-        procesoAdmitido = true;
+        despacharSiguienteSiCorresponde();
 
         vista.getBtnPasoAPaso().setEnabled(true);
         vista.getBtnEjecutarTodo().setEnabled(true);
-        vista.getBtnLimpiarReset().setEnabled(true);
 
         actualizarVista();
+
+        if (!planificador.getColaEspera().isEmpty()) {
+            JOptionPane.showMessageDialog(vista,
+                    planificador.getColaEspera().size() + " proceso(s) quedaron en cola de espera "
+                    + "por falta de memoria disponible. Se admitirán automáticamente cuando otro proceso termine.",
+                    "En espera", JOptionPane.INFORMATION_MESSAGE);
+        }
     }
 
     /*
-        * Nombre: deshabilitarTodosLosBotones
+        * Nombre: despacharSiguienteSiCorresponde
         *Entrada: void
         *Salida: void
-        *Descripción: Deshabilita todos los botones de la interfaz.
+        *Descripción: Si la CPU no tiene un proceso en ejecución, hace el cambio de contexto
+        * hacia el próximo proceso "Preparado" según el Planificador (FCFS).
      */
-    private void deshabilitarTodosLosBotones() {
-        vista.getBtnCargarArchivo().setEnabled(false);
-        vista.getBtnPasoAPaso().setEnabled(false);
-        vista.getBtnEjecutarTodo().setEnabled(false);
-        vista.getBtnConfigurarMemoria().setEnabled(false);
-        vista.getBtnLimpiarReset().setEnabled(false);
+    private void despacharSiguienteSiCorresponde() {
+        if (bcp == null || "Finalizado".equals(bcp.getEstado())) {
+            BCP siguiente = planificador.siguienteProceso();
+            if (siguiente != null) {
+                dispatcher.cambiarContexto(cpu, bcp, siguiente);
+                bcp = siguiente;
+            }
+        }
     }
 
     
@@ -237,17 +246,26 @@ public class ControllerMiniPC {
         * Nombre: ejecutarPaso
         *Entrada: void
         *Salida: void
-        *Descripción: Ejecuta un paso del programa.
+        *Descripción: Ejecuta un paso: si la CPU está libre, primero hace el cambio de contexto
+        * hacia el siguiente proceso "Preparado" (ese clic no ejecuta instrucción); si ya hay un
+        * proceso en ejecución, corre una instrucción de él.
      */
     private void ejecutarPaso() {
-        if (programaActual == null) {
-            JOptionPane.showMessageDialog(vista, "Primero carga un archivo .asm",
-                    "Sin programa", JOptionPane.WARNING_MESSAGE);
+        if (cpu.isEsperandoEntrada()) {
+            avisarEsperandoTeclado();
             return;
         }
 
-        if (cpu.isEsperandoEntrada()) {
-            avisarEsperandoTeclado();
+        if (bcp == null || "Finalizado".equals(bcp.getEstado())) {
+            BCP siguiente = planificador.siguienteProceso();
+            if (siguiente == null) {
+                JOptionPane.showMessageDialog(vista, "No hay ningún proceso listo para ejecutar. Carga un archivo .asm",
+                        "Sin proceso", JOptionPane.WARNING_MESSAGE);
+                return;
+            }
+            dispatcher.cambiarContexto(cpu, bcp, siguiente);
+            bcp = siguiente;
+            actualizarVista();
             return;
         }
 
@@ -264,8 +282,12 @@ public class ControllerMiniPC {
                     "Aviso de ejecución", JOptionPane.WARNING_MESSAGE);
         }
 
-        if (!continua && !cpu.isEsperandoEntrada()) {
-            finalizarEjecucion();
+        if (!continua) {
+            liberarYRegistrar(bcp);
+            actualizarVista();
+            if (!quedaTrabajoPendiente()) {
+                finalizarEjecucion();
+            }
         }
     }
 
@@ -273,32 +295,77 @@ public class ControllerMiniPC {
         * Nombre: ejecutarTodo
         *Entrada: void
         *Salida: void
-        *Descripción: Ejecuta todo el programa.
+        *Descripción: Ejecuta, en orden FCFS, cada proceso admitido hasta su finalización,
+        * despachando automáticamente al siguiente "Preparado" cuando el actual termina.
      */
     private void ejecutarTodo() {
-        if (programaActual == null) {
-            JOptionPane.showMessageDialog(vista, "Primero carga un archivo .asm",
-                    "Sin programa", JOptionPane.WARNING_MESSAGE);
-            return;
-        }
-
         if (cpu.isEsperandoEntrada()) {
             avisarEsperandoTeclado();
             return;
         }
 
-        boolean continua = true;
-        while (continua) {
-            continua = cpu.paso();
+        if (bcp == null && historialProcesos.isEmpty() && planificador.getColaEspera().isEmpty()) {
+            JOptionPane.showMessageDialog(vista, "Primero carga un archivo .asm",
+                    "Sin programa", JOptionPane.WARNING_MESSAGE);
+            return;
+        }
+
+        while (true) {
+            if (bcp == null || "Finalizado".equals(bcp.getEstado())) {
+                BCP siguiente = planificador.siguienteProceso();
+                if (siguiente == null) {
+                    break; // no quedan procesos listos
+                }
+                dispatcher.cambiarContexto(cpu, bcp, siguiente);
+                bcp = siguiente;
+            }
+
+            boolean continua = cpu.paso();
+
             if (cpu.isEsperandoEntrada()) {
                 ejecutandoAutomatico = true;
                 actualizarVista();
                 avisarEsperandoTeclado();
                 return;
             }
+
+            if (!continua) {
+                liberarYRegistrar(bcp);
+            }
         }
         actualizarVista();
         finalizarEjecucion();
+    }
+
+    /*
+        * Nombre: liberarYRegistrar
+        *Entrada: BCP finalizado
+        *Salida: void
+        *Descripción: Avisa al Planificador que un proceso terminó (libera su cupo y admite
+        * automáticamente al siguiente en cola de espera, si hay). Si se admitió uno nuevo,
+        * se agrega al historial para que aparezca en las tablas.
+     */
+    private void liberarYRegistrar(BCP finalizado) {
+        BCP admitidoDeEspera = planificador.liberarProceso(finalizado);
+        if (admitidoDeEspera != null) {
+            historialProcesos.add(admitidoDeEspera);
+        }
+    }
+
+    /*
+        * Nombre: quedaTrabajoPendiente
+        *Entrada: void
+        *Salida: boolean
+        *Descripción: Indica si aún hay algo por ejecutar (proceso en CPU, listos, o en cola de espera).
+     */
+    private boolean quedaTrabajoPendiente() {
+        if (bcp != null && !"Finalizado".equals(bcp.getEstado())) {
+            return true;
+        }
+        if (planificador.siguienteProceso() != null) {
+            return true;
+        }
+        return !planificador.getColaEspera().isEmpty();
     }
 
     // ===================== RESET Y CONFIGURACIÓN =====================
@@ -311,9 +378,7 @@ public class ControllerMiniPC {
      */
     private void limpiarTodo() {
         inicializarMaquina(memoria.getTamanoTotal(), memoria.getInicioMemoriaUsuario());
-        programaActual = null;
-        nombreProgramaActual = null;
-        procesoAdmitido = false;
+        historialProcesos = new ArrayList<>();
         ejecutandoAutomatico = false;
 
         vista.getModeloMemoria().setRowCount(0);
@@ -327,6 +392,7 @@ public class ControllerMiniPC {
         vista.getBtnLimpiarReset().setEnabled(true);
 
         actualizarVista();
+        actualizarTablaDisco();
     }
 
     /*
@@ -340,9 +406,7 @@ public class ControllerMiniPC {
         int nuevoKernel = Math.max((int) Math.round(nuevoTamano * 0.25), 16); // mismo cálculo que usa la vista
 
         inicializarMaquina(nuevoTamano, nuevoKernel);
-        programaActual = null;
-        nombreProgramaActual = null;
-        procesoAdmitido = false;
+        historialProcesos = new ArrayList<>();
         ejecutandoAutomatico = false;
 
         vista.getModeloMemoria().setRowCount(0);
@@ -356,24 +420,16 @@ public class ControllerMiniPC {
         vista.getBtnLimpiarReset().setEnabled(true);
 
         actualizarVista();
+        actualizarTablaDisco();
     }
 
     // ===================== EXTRAS =====================
 
     /*
-        * Nombre: procesoHayQueResetear
-        *Entrada: void
-        *Salida: boolean
-        *Descripción: Verifica si el proceso actual necesita ser reiniciado.
-     */
-    private boolean procesoHayQueResetear() {
-        return procesoAdmitido && bcp != null && !"Finalizado".equals(bcp.getEstado());
-    }
-    /*
         * Nombre: actualizarTablaMemoria
         *Entrada: void
         *Salida: void
-        *Descripción: Actualiza la tabla de la memoria.
+        *Descripción: Actualiza la tabla de la memoria, mostrando el segmento de cada proceso admitido.
      */
     private void actualizarTablaMemoria() {
         DefaultTableModel modelo = vista.getModeloMemoria();
@@ -383,7 +439,7 @@ public class ControllerMiniPC {
         int inicioUsuario = memoria.getInicioMemoriaUsuario();
         int finTotal = memoria.getTamanoTotal() - 1;
 
-        // ===== Sección KERNEL: atributos del BCP + huecos agrupados =====
+        // ===== Sección KERNEL: atributos de los BCP + huecos agrupados =====
         int pos = 0;
         while (pos <= finKernel) {
             String label = memoria.getLabel(pos);
@@ -397,27 +453,26 @@ public class ControllerMiniPC {
                     pos++;
                 }
                 int finLibre = pos - 1;
-                String rango = (inicioLibre == finLibre) ? String.valueOf(inicioLibre) : inicioLibre + "-" + finLibre;
-                modelo.addRow(new Object[]{rango, "Kernel Libre"});
+                modelo.addRow(new Object[]{rango(inicioLibre, finLibre), "Kernel Libre"});
             }
         }
 
-        // ===== Sección USUARIO: instrucciones cargadas =====
+        // ===== Sección USUARIO: instrucciones de cada proceso admitido, en orden de llegada =====
         int posUsuario = inicioUsuario;
-        if (procesoAdmitido && programaActual != null) {
-            int finPrograma = inicioUsuario + programaActual.size();
-            for (int direccion = inicioUsuario; direccion < finPrograma; direccion++) {
+        for (BCP proceso : historialProcesos) {
+            int base = proceso.getBase();
+            int finProceso = base + proceso.getTamano();
+            for (int direccion = base; direccion < finProceso; direccion++) {
                 Instruccion instr = memoria.leerInstruccion(direccion);
                 String textoInstr = (instr != null) ? instr.getLineaOriginal() : "";
-                modelo.addRow(new Object[]{direccion, textoInstr});
+                modelo.addRow(new Object[]{direccion, "PID " + proceso.getPID() + ": " + textoInstr});
             }
-            posUsuario = finPrograma;
+            posUsuario = finProceso;
         }
 
         // RESTO USUARIO: espacio libre agrupado en una sola fila
         if (posUsuario <= finTotal) {
-            String rango = (posUsuario == finTotal) ? String.valueOf(posUsuario) : posUsuario + "-" + finTotal;
-            modelo.addRow(new Object[]{rango, "Usuario Libre"});
+            modelo.addRow(new Object[]{rango(posUsuario, finTotal), "Usuario Libre"});
         }
     }
 
@@ -425,13 +480,17 @@ public class ControllerMiniPC {
         * Nombre: actualizarTablaProcesos
         *Entrada: void
         *Salida: void
-        *Descripción: Actualiza la tabla de la cola de trabajo (por ahora un único proceso).
+        *Descripción: Actualiza la tabla de la lista/cola de trabajos: todos los procesos admitidos
+        * (con su estado actual) más los que siguen esperando memoria disponible.
      */
     private void actualizarTablaProcesos() {
         DefaultTableModel modelo = vista.getModeloProcesos();
         modelo.setRowCount(0);
-        if (programaActual != null && bcp != null) {
-            modelo.addRow(new Object[]{"PID 1", bcp.getEstado()});
+        for (BCP proceso : historialProcesos) {
+            modelo.addRow(new Object[]{"PID " + proceso.getPID(), proceso.getEstado()});
+        }
+        for (String nombreEnEspera : planificador.getColaEspera()) {
+            modelo.addRow(new Object[]{"--", nombreEnEspera + " (en espera por memoria)"});
         }
     }
 
@@ -527,7 +586,7 @@ public class ControllerMiniPC {
         resetEntradaTeclado();
         vista.getBtnPasoAPaso().setEnabled(false);
         vista.getBtnEjecutarTodo().setEnabled(false);
-        JOptionPane.showMessageDialog(vista, "Programa terminado",
+        JOptionPane.showMessageDialog(vista, "Todos los procesos admitidos finalizaron su ejecución",
                 "Ejecución finalizada", JOptionPane.INFORMATION_MESSAGE);
     }
 
@@ -546,6 +605,7 @@ public class ControllerMiniPC {
         vista.getLblBX().setText(String.valueOf(cpu.getBX()));
         vista.getLblCX().setText(String.valueOf(cpu.getCX()));
         vista.getLblDX().setText(String.valueOf(cpu.getDX()));
+        vista.getLblPID().setText(bcp != null ? "PID " + bcp.getPID() : "PID --");
         vista.getLblEstadoProceso().setText(bcp != null ? bcp.getEstado() : "Esperando archivo");
 
         actualizarTablaMemoria();

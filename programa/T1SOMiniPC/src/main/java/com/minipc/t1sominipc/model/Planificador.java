@@ -9,6 +9,8 @@ public class Planificador {
     private Disco disco;
     private ListaProcesos listaProcesos;
     private List<String> colaEspera; // nombres de archivos en Disco, esperando admisión
+    private List<Integer> direccionesBCPLibres; // direcciones de kernel de BCP ya finalizados, listas para reutilizar
+    private int siguienteDireccionBCPNueva; // próxima dirección de kernel no usada por un BCP
     private int siguientePID;
 
     public Planificador(Memoria memoria, Disco disco) {
@@ -16,6 +18,8 @@ public class Planificador {
         this.disco = disco;
         this.listaProcesos = new ListaProcesos();
         this.colaEspera = new ArrayList<>();
+        this.direccionesBCPLibres = new ArrayList<>();
+        this.siguienteDireccionBCPNueva = 0;
         this.siguientePID = 1;
     }
 
@@ -29,7 +33,11 @@ public class Planificador {
     public int getMaximoProcesos() {
         int espacioKernel = memoria.getFinMemoriaKernel() + 1;
         int caben = espacioKernel / BCP.getTamanoBCP();
-        return Math.min(caben, 5);
+        int min = 5;
+        if(min > caben) {
+            min = caben;
+        }
+        return min;
     }
 
     /*
@@ -45,7 +53,7 @@ public class Planificador {
             return null;
         }
 
-        if (listaProcesos.estaLlena(getMaximoProcesos())) {
+        if (!hayDireccionDisponibleParaBCP()) {
             colaEspera.add(nombreArchivo);
             return null;
         }
@@ -60,13 +68,46 @@ public class Planificador {
     }
 
     /*
+        * Nombre: hayDireccionDisponibleParaBCP
+        *Entrada: void
+        *Salida: boolean
+        *Descripción: Indica si hay una dirección de kernel libre (reciclada o nueva) para
+        * guardar un BCP más, respetando el límite de getMaximoProcesos().
+     */
+    private boolean hayDireccionDisponibleParaBCP() {
+        if (listaProcesos.getCantidad() >= getMaximoProcesos()) {
+            return false;
+        }
+        if (!direccionesBCPLibres.isEmpty()) {
+            return true;
+        }
+        return siguienteDireccionBCPNueva + BCP.getTamanoBCP() - 1 <= memoria.getFinMemoriaKernel();
+    }
+
+    /*
+        * Nombre: obtenerDireccionParaNuevoBCP
+        *Entrada: void
+        *Salida: int
+        *Descripción: Reutiliza la dirección de un BCP ya finalizado si hay alguna disponible;
+        * si no, entrega la siguiente dirección de kernel nunca antes usada.
+     */
+    private int obtenerDireccionParaNuevoBCP() {
+        if (!direccionesBCPLibres.isEmpty()) {
+            return direccionesBCPLibres.remove(0);
+        }
+        int direccion = siguienteDireccionBCPNueva;
+        siguienteDireccionBCPNueva += BCP.getTamanoBCP();
+        return direccion;
+    }
+
+    /*
         * Nombre: crearYAdmitir
         *Entrada: String nombreArchivo, List<Instruccion> programa, int baseUsuario
         *Salida: BCP
         *Descripción: Crea un nuevo BCP para el programa y lo admite en la lista de procesos.
      */
     private BCP crearYAdmitir(String nombreArchivo, List<Instruccion> programa, int baseUsuario) {
-        int direccionBase = listaProcesos.getCantidad() * BCP.getTamanoBCP();
+        int direccionBase = obtenerDireccionParaNuevoBCP();
         memoria.cargarPrograma(programa, baseUsuario);
 
         BCP nuevoBcp = new BCP(memoria, direccionBase, siguientePID, baseUsuario, programa.size(), 0);
@@ -83,6 +124,7 @@ public class Planificador {
      */
     public BCP liberarProceso(BCP finalizado) {
         listaProcesos.eliminar(finalizado);
+        direccionesBCPLibres.add(finalizado.getDireccionBase());
 
         if (colaEspera.isEmpty()) {
             return null;

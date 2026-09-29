@@ -137,6 +137,18 @@ public class CPU {
             PC++;
         }
 
+        // Protección de memoria: si el programa no terminó con INT 20H y su PC se
+        // salió del espacio que se le asignó, se finaliza para no invadir memoria de otro proceso.
+        int inicioPrograma = bcp.getBase();
+        int finPrograma = inicioPrograma + programaActualTamano; // exclusivo
+        if (PC < inicioPrograma || PC >= finPrograma) {
+            ultimoError = "El proceso no terminó con INT 20H y se salió de su espacio de memoria; "
+                    + "se finalizó forzosamente para proteger a los demás procesos.";
+            bcp.actualizarEstado("Finalizado");
+            bcp.actualizarRegistros(PC, AC, AX, BX, CX, DX);
+            return false;
+        }
+
         //bcp.avanzarContador();
         bcp.actualizarRegistros(PC, AC, AX, BX, CX, DX);
 
@@ -350,11 +362,16 @@ public class CPU {
      */
     private int getRegistro(String registro) {
         switch (registro) {
-            case "AX": return AX;
-            case "BX": return BX;
-            case "CX": return CX;
-            case "DX": return DX;
-            default: throw new IllegalArgumentException("Registro no reconocido: " + registro);
+            case "AX": 
+                return AX;
+            case "BX": 
+                return BX;
+            case "CX":
+                return CX;
+            case "DX": 
+                return DX;
+            default: 
+                throw new IllegalArgumentException("Registro no reconocido: " + registro);
         }
     }
 
@@ -367,11 +384,20 @@ public class CPU {
 
     private void setRegistro(String registro, int valor) {
         switch (registro) {
-            case "AX": AX = valor; break;
-            case "BX": BX = valor; break;
-            case "CX": CX = valor; break;
-            case "DX": DX = valor; break;
-            default: throw new IllegalArgumentException("Registro no reconocido: " + registro);
+            case "AX": 
+                AX = valor; 
+                break;
+            case "BX": 
+                BX = valor; 
+                break;
+            case "CX": 
+                CX = valor; 
+                break;
+            case "DX": 
+                DX = valor; 
+                break;
+            default: 
+                throw new IllegalArgumentException("Registro no reconocido: " + registro);
         }
     }
 
