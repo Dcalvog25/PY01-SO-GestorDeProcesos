@@ -60,6 +60,16 @@ public class BCP {
         return pila;
     }
 
+    /*
+        * Nombre: asignarBase
+        * Descripción: Se llama cuando el programa entra a RAM (admisión o swap-in).
+        * Mientras el proceso no está en RAM, Base y PC valen -1.
+     */
+    public void asignarBase(int baseUsuario) {
+        memoria.escribir(direccionBase + BASE, baseUsuario, "Base");
+        memoria.escribir(direccionBase + PC, baseUsuario, "PC");
+    }
+
     public int getDireccionBase() {
         return direccionBase;
     }

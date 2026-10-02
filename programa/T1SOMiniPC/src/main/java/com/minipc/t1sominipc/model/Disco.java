@@ -14,6 +14,7 @@ public class Disco {
     private int[] datos;              // arreglo real y único del disco: aquí vive el índice (dirección + tamaño)
     private Instruccion[] contenido;  // mismo tamaño, misma dirección
     private String[] nombresArchivo;  //  mismo tamaño, misma dirección
+    private boolean[] ocupadaVirtual; // mismo tamaño; solo se usa dentro de la zona de memoria virtual
 
     private int tamanoTotal;
     private int tamanoIndice;
@@ -39,6 +40,7 @@ public class Disco {
         this.datos = new int[tamanoTotal];
         this.contenido = new Instruccion[tamanoTotal];
         this.nombresArchivo = new String[tamanoTotal];
+        this.ocupadaVirtual = new boolean[tamanoTotal];
 
         this.siguienteDireccionLibre = inicioZonaProgramas;
         this.cantidadArchivos = 0;
@@ -198,6 +200,102 @@ public class Disco {
             return true;
         }
         return false;
+    }
+
+    /*
+     * Nombre: getDireccionArchivo / getTamanoArchivo
+     * Descripción: Leen del índice la dirección de disco y el tamaño de un archivo, o -1 si no existe.
+     */
+    public int getDireccionArchivo(String nombre) {
+        int posIndice = buscarPorNombre(nombre);
+        if (posIndice == -1) {
+            return -1;
+        }
+        return datos[posIndice];
+    }
+
+    public int getTamanoArchivo(String nombre) {
+        int posIndice = buscarPorNombre(nombre);
+        if (posIndice == -1) {
+            return -1;
+        }
+        return datos[posIndice + 1];
+    }
+
+    /*
+     * Nombre: guardarEnMemoriaVirtual
+     * Descripción: Swap-out. Copia un programa a la zona de memoria virtual (primer hueco que quepa).
+     * El nombre y el tamaño quedan en la primera dirección del bloque.
+     * Salida: true si cupo, false si la memoria virtual no tiene un hueco suficiente.
+     */
+    public boolean guardarEnMemoriaVirtual(String nombre, List<Instruccion> programa) {
+        int tamano = programa.size();
+        int libresSeguidas = 0;
+        for (int i = inicioMemoriaVirtual; i < tamanoTotal; i++) {
+            if (ocupadaVirtual[i]) {
+                libresSeguidas = 0;
+            } else {
+                libresSeguidas++;
+            }
+            if (tamano > 0 && libresSeguidas == tamano) {
+                int base = i - tamano + 1;
+                datos[base] = tamano;
+                nombresArchivo[base] = nombre;
+                for (int j = 0; j < tamano; j++) {
+                    contenido[base + j] = programa.get(j);
+                    ocupadaVirtual[base + j] = true;
+                }
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /*
+     * Nombre: leerDeMemoriaVirtual
+     * Descripción: Lee un programa que está en la memoria virtual. Devuelve null si no está.
+     */
+    public List<Instruccion> leerDeMemoriaVirtual(String nombre) {
+        int base = buscarEnMemoriaVirtual(nombre);
+        if (base == -1) {
+            return null;
+        }
+        List<Instruccion> programa = new ArrayList<>();
+        for (int i = 0; i < datos[base]; i++) {
+            programa.add(contenido[base + i]);
+        }
+        return programa;
+    }
+
+    /*
+     * Nombre: liberarMemoriaVirtual
+     * Descripción: Swap-in terminado: libera el bloque que ocupaba el programa en la memoria virtual.
+     */
+    public void liberarMemoriaVirtual(String nombre) {
+        int base = buscarEnMemoriaVirtual(nombre);
+        if (base == -1) {
+            return;
+        }
+        int tamano = datos[base];
+        for (int i = base; i < base + tamano; i++) {
+            ocupadaVirtual[i] = false;
+            contenido[i] = null;
+        }
+        datos[base] = 0;
+        nombresArchivo[base] = null;
+    }
+
+    public boolean estaEnMemoriaVirtual(String nombre) {
+        return buscarEnMemoriaVirtual(nombre) != -1;
+    }
+
+    private int buscarEnMemoriaVirtual(String nombre) {
+        for (int i = inicioMemoriaVirtual; i < tamanoTotal; i++) {
+            if (nombre.equals(nombresArchivo[i])) {
+                return i;
+            }
+        }
+        return -1;
     }
     
     

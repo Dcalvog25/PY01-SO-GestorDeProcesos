@@ -23,7 +23,7 @@ public class Memoria {
     private int finMemoriaKernel;
     private int inicioMemoriaUsuario;
     private Instruccion[] instrucciones;
-    private int siguienteDireccionLibreUsuario;
+    private boolean[] ocupadaUsuario; // true si esa dirección de RAM pertenece a algún proceso
     
     /*
         * Nombre: Memoria
@@ -50,7 +50,7 @@ public class Memoria {
         this.memoria = new int[tamanoTotal];
         this.memoriaLabels = new String[tamanoTotal];
         this.instrucciones = new Instruccion[tamanoTotal];
-        this.siguienteDireccionLibreUsuario = tamanoKernel; // para no invadir el kernel
+        this.ocupadaUsuario = new boolean[tamanoTotal];
         
         for (int i = 0; i < tamanoTotal; i++) {
             memoria[i] = 0; 
@@ -152,6 +152,7 @@ public class Memoria {
             memoria[i] = 0; 
             memoriaLabels[i] = "";
             instrucciones[i] = null;
+            ocupadaUsuario[i] = false;
         }
     }
 
@@ -166,6 +167,7 @@ public class Memoria {
             memoria[i] = 0;
             memoriaLabels[i] = "";
             instrucciones[i] = null;
+            ocupadaUsuario[i] = false;
         }
     }
 
@@ -239,16 +241,56 @@ public class Memoria {
         return instrucciones[direccion];
     }
 
+    /*
+        * Nombre: asignarBloque
+        *Entrada: int tamano
+        *Salida: int
+        *Descripción: Reserva el primer bloque contiguo libre (first-fit) de la memoria de usuario.
+        * Devuelve la dirección base, o -1 si no cabe.
+     */
     public int asignarBloque(int tamano) {
-        if (siguienteDireccionLibreUsuario + tamano > tamanoTotal) {
-            return -1; // no cabe
+        int libresSeguidas = 0;
+        for (int i = inicioMemoriaUsuario; i < tamanoTotal; i++) {
+            if (ocupadaUsuario[i]) {
+                libresSeguidas = 0;
+            } else {
+                libresSeguidas++;
+            }
+            if (tamano > 0 && libresSeguidas == tamano) {
+                int base = i - tamano + 1;
+                for (int j = base; j <= i; j++) {
+                    ocupadaUsuario[j] = true;
+                }
+                return base;
+            }
         }
-        int base = siguienteDireccionLibreUsuario;
-        siguienteDireccionLibreUsuario += tamano;
-        return base;
+        return -1; // no cabe
+    }
+
+    /*
+        * Nombre: liberarBloque
+        *Entrada: int base, int tamano
+        *Salida: void
+        *Descripción: Devuelve un bloque a la memoria de usuario y borra su contenido.
+     */
+    public void liberarBloque(int base, int tamano) {
+        for (int i = base; i < base + tamano; i++) {
+            if (direccionValidaUsuario(i)) {
+                ocupadaUsuario[i] = false;
+                memoria[i] = 0;
+                memoriaLabels[i] = "";
+                instrucciones[i] = null;
+            }
+        }
     }
 
     public int getEspacioLibreUsuario() {
-        return tamanoTotal - siguienteDireccionLibreUsuario;
+        int libres = 0;
+        for (int i = inicioMemoriaUsuario; i < tamanoTotal; i++) {
+            if (!ocupadaUsuario[i]) {
+                libres++;
+            }
+        }
+        return libres;
     }
 }
