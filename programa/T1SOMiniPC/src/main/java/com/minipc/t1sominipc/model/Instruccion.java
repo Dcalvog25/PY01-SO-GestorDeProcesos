@@ -101,4 +101,36 @@ public class Instruccion {
     public String getValorTexto() {
         return valorTexto;
     }
+
+    /*
+        * Nombre: getPeso
+        * Descripción: Segundos (ticks) de CPU que dura la instrucción, según la tabla del enunciado.
+        * Entrada: void
+        * Salida: int
+     */
+    public int getPeso() {
+        switch (operador) {
+            case "LOAD":
+            case "STORE":
+            case "JMP":
+            case "CMP":
+            case "JE":
+            case "JNE":
+                return 2;
+            case "ADD":
+            case "SUB":
+            case "PARAM":
+                return 3;
+            case "INT":
+                if (valor != null && valor == 0x21) {
+                    return 5;
+                }
+                if (valor != null && valor == 0x09) {
+                    return 3;
+                }
+                return 2;
+            default:
+                return 1; // MOV, INC, DEC, SWAP, PUSH, POP
+        }
+    }
 }

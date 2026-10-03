@@ -32,6 +32,9 @@ public class CPU {
 
     private String dxTexto; // el "modo texto" de DX, separado del DX numérico
 
+    private int ticksRestantes; // ticks que faltan para terminar la instrucción en curso (0 = ninguna)
+    private int pesoActual;     // peso total de la instrucción en curso
+
     /*
         * Nombre: CPU
         * Descripcion: Constructor de la CPU.
@@ -97,6 +100,46 @@ public class CPU {
         this.programaActualTamano = nuevoBcp.getTamano();
         this.IR = "";
         this.ultimoError = null;
+        this.ticksRestantes = 0;
+        this.pesoActual = 0;
+    }
+
+    /*
+        * Nombre: tick
+        * Descripción: Un segundo de CPU. Una instrucción de peso N consume N ticks y sus efectos
+        * se aplican en el último (llama a paso()). Mientras tanto el PC sigue en esa instrucción.
+        * Salida: igual que paso().
+     */
+    public boolean tick() {
+        if (esperandoEntrada) {
+            return true;
+        }
+
+        if (ticksRestantes == 0) {
+            Instruccion actual = memoria.leerInstruccion(PC);
+            if (actual == null) {
+                return paso(); // paso() finaliza el proceso
+            }
+            ultimoError = null;
+            IR = actual.getLineaOriginal();
+            pesoActual = actual.getPeso();
+            ticksRestantes = pesoActual;
+        }
+
+        ticksRestantes--;
+        bcp.registrarTiempoEmpleado(bcp.getTiempoEmpleado() + 1);
+        if (ticksRestantes > 0) {
+            return true;
+        }
+        return paso();
+    }
+
+    public int getTicksRestantes() {
+        return ticksRestantes;
+    }
+
+    public int getPesoActual() {
+        return pesoActual;
     }
 
     /*

@@ -40,6 +40,7 @@ public class ControllerMiniPC {
     // "PID n - archivo" de los procesos ya terminados; su BCP se libera, solo se muestran en la tabla
     private List<String> finalizados = new ArrayList<>();
     private boolean ejecutandoAutomatico = false; // true si "Ejecutar Todo" quedó pausado esperando teclado
+    private Timer timerAuto; // un tick de CPU por segundo en modo automático
 
     /*
         * Nombre: ControllerMiniPC
@@ -286,7 +287,7 @@ public class ControllerMiniPC {
             return;
         }
 
-        boolean continua = cpu.paso(); // internamente ya pone "Ejecutando" antes de correr
+        boolean continua = cpu.tick(); // 1 clic = 1 segundo; una instrucción dura su peso en ticks
         actualizarVista();
 
         if(cpu.isEsperandoEntrada() ) {
@@ -312,8 +313,9 @@ public class ControllerMiniPC {
         * Nombre: ejecutarTodo
         *Entrada: void
         *Salida: void
-        *Descripción: Ejecuta, en orden FCFS, cada proceso admitido hasta su finalización,
-        * despachando automáticamente al siguiente "Preparado" cuando el actual termina.
+        *Descripción: Ejecuta en orden FCFS cada proceso admitido hasta su finalización, con un
+        * tick por segundo (una instrucción dura su peso en segundos), despachando al siguiente
+        * "Preparado" cuando el actual termina.
      */
     private void ejecutarTodo() {
         if (cpu.isEsperandoEntrada()) {
@@ -327,31 +329,72 @@ public class ControllerMiniPC {
             return;
         }
 
-        while (true) {
-            if (bcp == null || "Finalizado".equals(bcp.getEstado())) {
-                BCP siguiente = planificador.siguienteProceso();
-                if (siguiente == null) {
-                    break; // no quedan procesos listos
-                }
-                if (!dispatcher.cambiarContexto(cpu, bcp, siguiente)) {
-                    break;
-                }
-                bcp = siguiente;
-            }
+        ejecutandoAutomatico = true;
+        vista.getBtnPasoAPaso().setEnabled(false);
+        vista.getBtnEjecutarTodo().setEnabled(false);
 
-            boolean continua = cpu.paso();
+        timerAuto = new Timer(1000, e -> tickAutomatico());
+        timerAuto.start();
+    }
 
-            if (cpu.isEsperandoEntrada()) {
-                ejecutandoAutomatico = true;
-                actualizarVista();
-                avisarEsperandoTeclado();
+    /*
+        * Nombre: tickAutomatico
+        *Entrada: void
+        *Salida: void
+        *Descripción: Un segundo del modo automático: despacha al siguiente proceso (ese tick es el
+        * cambio de contexto) o avanza un tick de la instrucción en curso.
+     */
+    private void tickAutomatico() {
+        if (bcp == null) {
+            BCP siguiente = planificador.siguienteProceso();
+            if (siguiente == null || !dispatcher.cambiarContexto(cpu, null, siguiente)) {
+                terminarAutomatico();
                 return;
             }
+            bcp = siguiente;
+            actualizarVista();
+            return;
+        }
 
-            if (!continua) {
-                liberarYRegistrar(bcp);
+        boolean continua = cpu.tick();
+
+        if (cpu.isEsperandoEntrada()) {
+            detenerAutomatico();
+            actualizarVista();
+            avisarEsperandoTeclado();
+            return;
+        }
+
+        String error = cpu.getUltimoError();
+        if (!continua) {
+            liberarYRegistrar(bcp);
+        }
+        actualizarVista();
+
+        boolean fin = !continua && !quedaTrabajoPendiente();
+        if (error != null) {
+            timerAuto.stop(); // el diálogo modal no debe dejar correr más ticks
+            JOptionPane.showMessageDialog(vista, error, "Aviso de ejecución", JOptionPane.WARNING_MESSAGE);
+            if (!fin) {
+                timerAuto.start();
             }
         }
+        if (fin) {
+            terminarAutomatico();
+        }
+    }
+
+    private void detenerAutomatico() {
+        if (timerAuto != null) {
+            timerAuto.stop();
+        }
+        vista.getBtnPasoAPaso().setEnabled(true);
+        vista.getBtnEjecutarTodo().setEnabled(true);
+    }
+
+    private void terminarAutomatico() {
+        detenerAutomatico();
+        ejecutandoAutomatico = false;
         actualizarVista();
         finalizarEjecucion();
     }
@@ -391,6 +434,7 @@ public class ControllerMiniPC {
         *Descripción: Limpia toda la máquina y reinicia la interfaz.
      */
     private void limpiarTodo() {
+        detenerAutomatico();
         inicializarMaquina(memoria.getTamanoTotal(), memoria.getInicioMemoriaUsuario());
         finalizados = new ArrayList<>();
         ejecutandoAutomatico = false;
@@ -501,6 +545,9 @@ public class ControllerMiniPC {
                 modelo.addRow(new Object[]{rango(inicioLibre, posUsuario - 1), "Usuario Libre"});
             }
         }
+
+        // La instrucción en curso del proceso que está en CPU se pinta resaltada
+        vista.setDireccionResaltada((bcp != null && bcp.getBase() != -1) ? bcp.getPC() : -1);
     }
 
     /*
@@ -641,7 +688,11 @@ public class ControllerMiniPC {
         vista.getLblCX().setText(String.valueOf(cpu.getCX()));
         vista.getLblDX().setText(String.valueOf(cpu.getDX()));
         vista.getLblPID().setText(bcp != null ? "PID " + bcp.getPID() : "PID --");
-        vista.getLblEstadoProceso().setText(bcp != null ? bcp.getEstado() : "Esperando archivo");
+        String estado = (bcp != null) ? bcp.getEstado() : "Esperando archivo";
+        if (bcp != null && cpu.getTicksRestantes() > 0) {
+            estado += " - tick " + (cpu.getPesoActual() - cpu.getTicksRestantes()) + "/" + cpu.getPesoActual();
+        }
+        vista.getLblEstadoProceso().setText(estado);
 
         actualizarTablaMemoria();
         actualizarTablaProcesos();
@@ -707,7 +758,7 @@ public class ControllerMiniPC {
         }
     }
 
-    // El kernel es el 60% de la RAM: ahí caben 5 BCP y la Lista de Trabajo.
+    // El kernel es el 25% de la RAM: ahí caben 5 BCP y la Lista de Trabajo.
     private int calcularKernel(int tamanoRAM) {
         return Math.max((int) Math.round(tamanoRAM * 0.25), 16);
     }

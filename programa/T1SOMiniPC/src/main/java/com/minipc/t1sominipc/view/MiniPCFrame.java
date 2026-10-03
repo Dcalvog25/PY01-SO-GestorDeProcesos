@@ -2,6 +2,7 @@ package com.minipc.t1sominipc.view;
 
 import javax.swing.*;
 import javax.swing.table.DefaultTableModel;
+import javax.swing.table.DefaultTableCellRenderer;
 import java.awt.*;
 
 /*
@@ -24,6 +25,9 @@ public class MiniPCFrame extends JFrame {
     private static final Color ACCENT_GREEN = new Color(111, 207, 151);
     private static final Color ACCENT_RED = new Color(240, 166, 166);
     private static final Color BORDER_COLOR = new Color(30, 63, 95);
+    private static final Color BG_RESALTADO = new Color(122, 98, 24);
+
+    private int direccionResaltada = -1; // dir. de RAM de la instrucción en ejecución, -1 si no hay
 
     // Componentes de Control
     private JButton btnCargarArchivo;
@@ -204,6 +208,19 @@ public class MiniPCFrame extends JFrame {
             public boolean isCellEditable(int row, int col) { return false; }
         };
         tablaMemoria = crearTablaEstilizada(modeloMemoria);
+        // Las filas de RAM tienen la posición como Integer; las de kernel como String
+        tablaMemoria.setDefaultRenderer(Object.class, new DefaultTableCellRenderer() {
+            @Override
+            public Component getTableCellRendererComponent(JTable t, Object valor, boolean sel,
+                    boolean foco, int fila, int columna) {
+                Component c = super.getTableCellRendererComponent(t, valor, sel, foco, fila, columna);
+                Object pos = t.getValueAt(fila, 0);
+                boolean resaltada = pos instanceof Integer && (Integer) pos == direccionResaltada;
+                c.setBackground(resaltada ? BG_RESALTADO : BG_CARD);
+                c.setForeground(TEXT_LIGHT);
+                return c;
+            }
+        });
         JScrollPane scrollMemoria = new JScrollPane(tablaMemoria);
         scrollMemoria.getViewport().setBackground(BG_CARD);
         scrollMemoria.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
@@ -305,9 +322,9 @@ public class MiniPCFrame extends JFrame {
         spinnerTamanoRAM.setAlignmentX(Component.LEFT_ALIGNMENT);
         spinnerTamanoRAM.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
 
-        JLabel lblKernelInfo = crearEtiquetaCampo("Espacio de kernel (60% automático)");
+        JLabel lblKernelInfo = crearEtiquetaCampo("Espacio de kernel (25% automático)");
         lblKernelInfo.setAlignmentX(Component.LEFT_ALIGNMENT);
-        lblKernelCalculado = new JLabel("154 posiciones");
+        lblKernelCalculado = new JLabel("64 posiciones");
         lblKernelCalculado.setForeground(ACCENT_GREEN);
         lblKernelCalculado.setFont(new Font("Monospaced", Font.BOLD, 13));
         lblKernelCalculado.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -400,6 +417,17 @@ public class MiniPCFrame extends JFrame {
     }
 
     // ===================== GETTERS PARA EL CONTROLLER =====================
+    public void setDireccionResaltada(int direccion) {
+        direccionResaltada = direccion;
+        for (int fila = 0; fila < modeloMemoria.getRowCount(); fila++) {
+            Object pos = modeloMemoria.getValueAt(fila, 0);
+            if (pos instanceof Integer && (Integer) pos == direccion) {
+                tablaMemoria.scrollRectToVisible(tablaMemoria.getCellRect(fila, 0, true));
+                break;
+            }
+        }
+        tablaMemoria.repaint();
+    }
     public JButton getBtnCargarArchivo() { 
         return btnCargarArchivo; 
     }
