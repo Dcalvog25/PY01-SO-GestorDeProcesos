@@ -6,6 +6,8 @@ import com.minipc.t1sominipc.model.ConvertidorASM;
 import com.minipc.t1sominipc.model.Disco;
 import com.minipc.t1sominipc.model.Dispatcher;
 import com.minipc.t1sominipc.model.Instruccion;
+import com.minipc.t1sominipc.model.ListaProcesos;
+import com.minipc.t1sominipc.model.ListaTrabajo;
 import com.minipc.t1sominipc.model.Memoria;
 import com.minipc.t1sominipc.model.Pantalla;
 import com.minipc.t1sominipc.model.Planificador;
@@ -35,8 +37,8 @@ public class ControllerMiniPC {
     private Planificador planificador;
     private Dispatcher dispatcher;
 
-    // Historial de todos los BCP admitidos (se conservan aun después de "Finalizado" para mostrarlos en las tablas)
-    private List<BCP> historialProcesos = new ArrayList<>();
+    // "PID n - archivo" de los procesos ya terminados; su BCP se libera, solo se muestran en la tabla
+    private List<String> finalizados = new ArrayList<>();
     private boolean ejecutandoAutomatico = false; // true si "Ejecutar Todo" quedó pausado esperando teclado
 
     /*
@@ -48,7 +50,7 @@ public class ControllerMiniPC {
     public ControllerMiniPC(MiniPCFrame vista) {
         this.vista = vista;
         this.parser = new ConvertidorASM();
-        inicializarMaquina(256, 64);
+        inicializarMaquina(256, calcularKernel(256));
         registrarEventos();
         actualizarVista();
     }
@@ -128,6 +130,7 @@ public class ControllerMiniPC {
         }
 
         actualizarTablaDisco();
+        actualizarVista(); // ya hay trabajos en la Lista de Trabajo: bloquea cargar/configurar
         admitirProcesos(nombresAceptados);
     }
 
@@ -166,10 +169,15 @@ public class ControllerMiniPC {
             return nombre + ": ya hay un archivo con ese nombre en el disco.";
         }
 
+        if (!planificador.getListaTrabajo().hayEspacio()) {
+            return nombre + ": la Lista de Trabajo está llena (no queda espacio en el kernel).";
+        }
+
         if (!disco.guardarArchivo(nombre, programa)) {
             return nombre + ": no se pudo guardar en disco (sin espacio o índice lleno).";
         }
 
+        planificador.registrarTrabajo(nombre);
         return null;
     }
 
@@ -178,33 +186,28 @@ public class ControllerMiniPC {
         *Entrada: List<String> nombresArchivos
         *Salida: void
         *Descripción: Simula el tiempo de admisión (preparar memoria) para un lote de archivos
-        * ya guardados en Disco, y luego los entrega al Planificador.
+        * ya guardados en Disco y registrados en la Lista de Trabajo, y luego pide su admisión.
      */
     private void admitirProcesos(List<String> nombresArchivos) {
         vista.getBtnPasoAPaso().setEnabled(false);
         vista.getBtnEjecutarTodo().setEnabled(false);
         vista.getLblEstadoProceso().setText("Preparando memoria para " + nombresArchivos.size() + " proceso(s)...");
 
-        Timer timerAdmision = new Timer(1200, e -> completarAdmision(nombresArchivos));
+        Timer timerAdmision = new Timer(1200, e -> completarAdmision());
         timerAdmision.setRepeats(false);
         timerAdmision.start();
     }
 
     /*
         * Nombre: completarAdmision
-        *Entrada: List<String> nombresArchivos
+        *Entrada: void
         *Salida: void
-        *Descripción: Solicita al Planificador la admisión (FCFS) de cada archivo del lote.
-        * Los que no quepan quedan en la cola de espera del Planificador. Si la CPU está libre,
-        * despacha de inmediato al primer proceso "Preparado".
+        *Descripción: Pide al Planificador admitir los trabajos pendientes (dos pasos: BCP en kernel,
+        * luego RAM). Si la CPU está libre, despacha al primer proceso "Preparado" y avisa de los
+        * trabajos que quedaron esperando.
      */
-    private void completarAdmision(List<String> nombresArchivos) {
-        for (String nombre : nombresArchivos) {
-            BCP admitido = planificador.solicitarAdmision(nombre);
-            if (admitido != null) {
-                historialProcesos.add(admitido);
-            }
-        }
+    private void completarAdmision() {
+        planificador.admitirPendientes();
 
         despacharSiguienteSiCorresponde();
 
@@ -213,11 +216,25 @@ public class ControllerMiniPC {
 
         actualizarVista();
 
-        if (!planificador.getColaEspera().isEmpty()) {
-            JOptionPane.showMessageDialog(vista,
-                    planificador.getColaEspera().size() + " proceso(s) quedaron en cola de espera "
-                    + "por falta de memoria disponible. Se admitirán automáticamente cuando otro proceso termine.",
-                    "En espera", JOptionPane.INFORMATION_MESSAGE);
+        int sinBCP = planificador.getColaEspera().size();
+        int sinRAM = 0;
+        for (BCP proceso : planificador.getListaProcesos().getTodos()) {
+            if ("EnEspera".equals(proceso.getEstado())) {
+                sinRAM++;
+            }
+        }
+
+        StringBuilder aviso = new StringBuilder();
+        if (sinBCP > 0) {
+            aviso.append(sinBCP).append(" programa(s) siguen en la Lista de Trabajo: no cabe otro BCP en el kernel "
+                    + "(máximo ").append(planificador.getMaximoProcesos()).append(" procesos).\n");
+        }
+        if (sinRAM > 0) {
+            aviso.append(sinRAM).append(" proceso(s) tienen BCP pero no caben en RAM: esperan en la memoria virtual del disco.\n");
+        }
+        if (aviso.length() > 0) {
+            aviso.append("Se admitirán automáticamente cuando termine un proceso.");
+            JOptionPane.showMessageDialog(vista, aviso.toString(), "En espera", JOptionPane.INFORMATION_MESSAGE);
         }
     }
 
@@ -231,8 +248,7 @@ public class ControllerMiniPC {
     private void despacharSiguienteSiCorresponde() {
         if (bcp == null || "Finalizado".equals(bcp.getEstado())) {
             BCP siguiente = planificador.siguienteProceso();
-            if (siguiente != null) {
-                dispatcher.cambiarContexto(cpu, bcp, siguiente);
+            if (siguiente != null && dispatcher.cambiarContexto(cpu, bcp, siguiente)) {
                 bcp = siguiente;
             }
         }
@@ -263,8 +279,9 @@ public class ControllerMiniPC {
                         "Sin proceso", JOptionPane.WARNING_MESSAGE);
                 return;
             }
-            dispatcher.cambiarContexto(cpu, bcp, siguiente);
-            bcp = siguiente;
+            if (dispatcher.cambiarContexto(cpu, bcp, siguiente)) {
+                bcp = siguiente;
+            }
             actualizarVista();
             return;
         }
@@ -304,7 +321,7 @@ public class ControllerMiniPC {
             return;
         }
 
-        if (bcp == null && historialProcesos.isEmpty() && planificador.getColaEspera().isEmpty()) {
+        if (bcp == null && planificador.getListaTrabajo().getCantidad() == 0) {
             JOptionPane.showMessageDialog(vista, "Primero carga un archivo .asm",
                     "Sin programa", JOptionPane.WARNING_MESSAGE);
             return;
@@ -316,7 +333,9 @@ public class ControllerMiniPC {
                 if (siguiente == null) {
                     break; // no quedan procesos listos
                 }
-                dispatcher.cambiarContexto(cpu, bcp, siguiente);
+                if (!dispatcher.cambiarContexto(cpu, bcp, siguiente)) {
+                    break;
+                }
                 bcp = siguiente;
             }
 
@@ -341,31 +360,26 @@ public class ControllerMiniPC {
         * Nombre: liberarYRegistrar
         *Entrada: BCP finalizado
         *Salida: void
-        *Descripción: Avisa al Planificador que un proceso terminó (libera su cupo y admite
-        * automáticamente al siguiente en cola de espera, si hay). Si se admitió uno nuevo,
-        * se agrega al historial para que aparezca en las tablas.
+        *Descripción: Avisa al Planificador que un proceso terminó: se libera su RAM, su BCP y su
+        * entrada de la Lista de Trabajo, y se admite lo que estaba esperando. La CPU queda libre.
      */
     private void liberarYRegistrar(BCP finalizado) {
-        BCP admitidoDeEspera = planificador.liberarProceso(finalizado);
-        if (admitidoDeEspera != null) {
-            historialProcesos.add(admitidoDeEspera);
-        }
+        ListaTrabajo trabajos = planificador.getListaTrabajo();
+        int indice = trabajos.buscarPorPID(finalizado.getPID());
+        finalizados.add("PID " + finalizado.getPID() + " - " + trabajos.getNombre(indice));
+
+        planificador.liberarProceso(finalizado);
+        bcp = null; // su espacio de BCP pudo reutilizarse de inmediato por otro proceso
     }
 
     /*
         * Nombre: quedaTrabajoPendiente
         *Entrada: void
         *Salida: boolean
-        *Descripción: Indica si aún hay algo por ejecutar (proceso en CPU, listos, o en cola de espera).
+        *Descripción: Indica si aún hay programas en la Lista de Trabajo (sin terminar).
      */
     private boolean quedaTrabajoPendiente() {
-        if (bcp != null && !"Finalizado".equals(bcp.getEstado())) {
-            return true;
-        }
-        if (planificador.siguienteProceso() != null) {
-            return true;
-        }
-        return !planificador.getColaEspera().isEmpty();
+        return planificador.getListaTrabajo().getCantidad() > 0;
     }
 
     // ===================== RESET Y CONFIGURACIÓN =====================
@@ -378,7 +392,7 @@ public class ControllerMiniPC {
      */
     private void limpiarTodo() {
         inicializarMaquina(memoria.getTamanoTotal(), memoria.getInicioMemoriaUsuario());
-        historialProcesos = new ArrayList<>();
+        finalizados = new ArrayList<>();
         ejecutandoAutomatico = false;
 
         vista.getModeloMemoria().setRowCount(0);
@@ -403,10 +417,10 @@ public class ControllerMiniPC {
      */
     private void aplicarConfiguracion() {
         int nuevoTamano = (Integer) vista.getSpinnerTamanoRAM().getValue();
-        int nuevoKernel = Math.max((int) Math.round(nuevoTamano * 0.25), 16); // mismo cálculo que usa la vista
+        int nuevoKernel = calcularKernel(nuevoTamano);
 
         inicializarMaquina(nuevoTamano, nuevoKernel);
-        historialProcesos = new ArrayList<>();
+        finalizados = new ArrayList<>();
         ejecutandoAutomatico = false;
 
         vista.getModeloMemoria().setRowCount(0);
@@ -429,50 +443,63 @@ public class ControllerMiniPC {
         * Nombre: actualizarTablaMemoria
         *Entrada: void
         *Salida: void
-        *Descripción: Actualiza la tabla de la memoria, mostrando el segmento de cada proceso admitido.
+        *Descripción: Actualiza la tabla de la memoria: zona de BCP y Lista de Trabajo del kernel,
+        * y los programas que están en RAM.
      */
     private void actualizarTablaMemoria() {
         DefaultTableModel modelo = vista.getModeloMemoria();
         modelo.setRowCount(0);
 
-        int finKernel = memoria.getFinMemoriaKernel();
-        int inicioUsuario = memoria.getInicioMemoriaUsuario();
-        int finTotal = memoria.getTamanoTotal() - 1;
+        ListaProcesos procesos = planificador.getListaProcesos();
+        ListaTrabajo trabajos = planificador.getListaTrabajo();
+        int tamBCP = BCP.getTamanoBCP();
+        int tamEntrada = ListaTrabajo.getTamanoEntrada();
 
-        // ===== Sección KERNEL: atributos de los BCP + huecos agrupados =====
-        int pos = 0;
-        while (pos <= finKernel) {
-            String label = memoria.getLabel(pos);
+        // ===== KERNEL: un espacio por cada BCP que cabe =====
+        for (int espacio = 0; espacio < procesos.getMaximo(); espacio++) {
+            int inicio = espacio * tamBCP;
+            if (buscarBCPEnDireccion(inicio) == null) {
+                modelo.addRow(new Object[]{rango(inicio, inicio + tamBCP - 1), "BCP libre"});
+                continue;
+            }
+            for (int pos = inicio; pos < inicio + tamBCP; pos++) {
+                modelo.addRow(new Object[]{String.valueOf(pos), memoria.getLabel(pos) + " = " + memoria.leer(pos)});
+            }
+        }
 
-            if (label != null && !label.isEmpty()) {
-                modelo.addRow(new Object[]{String.valueOf(pos), label + " = " + memoria.leer(pos)});
-                pos++;
-            } else {
-                int inicioLibre = pos;
-                while (pos <= finKernel && (memoria.getLabel(pos) == null || memoria.getLabel(pos).isEmpty())) {
-                    pos++;
+        // ===== KERNEL: Lista de Trabajo =====
+        for (int i = 0; i < trabajos.getCantidad(); i++) {
+            int inicio = trabajos.getInicio() + i * tamEntrada;
+            for (int pos = inicio; pos < inicio + tamEntrada; pos++) {
+                String texto = memoria.getLabel(pos) + " = " + memoria.leer(pos);
+                if (pos == inicio) {
+                    texto += " (" + trabajos.getNombre(i) + ")";
                 }
-                int finLibre = pos - 1;
-                modelo.addRow(new Object[]{rango(inicioLibre, finLibre), "Kernel Libre"});
+                modelo.addRow(new Object[]{String.valueOf(pos), texto});
             }
         }
-
-        // ===== Sección USUARIO: instrucciones de cada proceso admitido, en orden de llegada =====
-        int posUsuario = inicioUsuario;
-        for (BCP proceso : historialProcesos) {
-            int base = proceso.getBase();
-            int finProceso = base + proceso.getTamano();
-            for (int direccion = base; direccion < finProceso; direccion++) {
-                Instruccion instr = memoria.leerInstruccion(direccion);
-                String textoInstr = (instr != null) ? instr.getLineaOriginal() : "";
-                modelo.addRow(new Object[]{direccion, "PID " + proceso.getPID() + ": " + textoInstr});
-            }
-            posUsuario = finProceso;
+        int inicioLibreTrabajo = trabajos.getInicio() + trabajos.getCantidad() * tamEntrada;
+        if (inicioLibreTrabajo <= memoria.getFinMemoriaKernel()) {
+            modelo.addRow(new Object[]{rango(inicioLibreTrabajo, memoria.getFinMemoriaKernel()), "Kernel Libre (Lista de Trabajo)"});
         }
 
-        // RESTO USUARIO: espacio libre agrupado en una sola fila
-        if (posUsuario <= finTotal) {
-            modelo.addRow(new Object[]{rango(posUsuario, finTotal), "Usuario Libre"});
+        // ===== USUARIO: instrucciones en RAM y huecos libres agrupados =====
+        int finTotal = memoria.getTamanoTotal() - 1;
+        int posUsuario = memoria.getInicioMemoriaUsuario();
+        while (posUsuario <= finTotal) {
+            Instruccion instr = memoria.leerInstruccion(posUsuario);
+            if (instr != null) {
+                BCP dueno = buscarBCPDuenoDeRAM(posUsuario);
+                String prefijo = (dueno != null) ? "PID " + dueno.getPID() + ": " : "";
+                modelo.addRow(new Object[]{posUsuario, prefijo + instr.getLineaOriginal()});
+                posUsuario++;
+            } else {
+                int inicioLibre = posUsuario;
+                while (posUsuario <= finTotal && memoria.leerInstruccion(posUsuario) == null) {
+                    posUsuario++;
+                }
+                modelo.addRow(new Object[]{rango(inicioLibre, posUsuario - 1), "Usuario Libre"});
+            }
         }
     }
 
@@ -486,11 +513,19 @@ public class ControllerMiniPC {
     private void actualizarTablaProcesos() {
         DefaultTableModel modelo = vista.getModeloProcesos();
         modelo.setRowCount(0);
-        for (BCP proceso : historialProcesos) {
-            modelo.addRow(new Object[]{"PID " + proceso.getPID(), proceso.getEstado()});
+        for (String terminado : finalizados) {
+            modelo.addRow(new Object[]{terminado, "Finalizado"});
         }
-        for (String nombreEnEspera : planificador.getColaEspera()) {
-            modelo.addRow(new Object[]{"--", nombreEnEspera + " (en espera por memoria)"});
+
+        ListaTrabajo trabajos = planificador.getListaTrabajo();
+        for (int i = 0; i < trabajos.getCantidad(); i++) {
+            int pid = trabajos.getPID(i);
+            BCP proceso = buscarBCPPorPID(pid);
+            if (proceso == null) {
+                modelo.addRow(new Object[]{"-- " + trabajos.getNombre(i), "Sin BCP (espera espacio de BCP)"});
+            } else {
+                modelo.addRow(new Object[]{"PID " + pid + " - " + trabajos.getNombre(i), proceso.getEstado()});
+            }
         }
     }
 
@@ -610,7 +645,9 @@ public class ControllerMiniPC {
 
         actualizarTablaMemoria();
         actualizarTablaProcesos();
+        actualizarTablaDisco();
         actualizarConsola();
+        actualizarBotonesBloqueo();
     }
 
     private void actualizarTablaDisco() {
@@ -648,9 +685,66 @@ public class ControllerMiniPC {
             modelo.addRow(new Object[]{rango(inicioLibreProg, finProg), "Programas libre"});
         }
 
-        // Sección 3: memoria virtual reservada
-        modelo.addRow(new Object[]{rango(disco.getInicioMemoriaVirtual(), disco.getTamanoTotal() - 1),
-                "Memoria virtual (reservada)"});
+        // Sección 3: memoria virtual (programas que esperan RAM)
+        int pos = disco.getInicioMemoriaVirtual();
+        int finVirtual = disco.getTamanoTotal() - 1;
+        while (pos <= finVirtual) {
+            String nombre = disco.leerNombre(pos);
+            if (nombre != null) {
+                int tamano = Math.max(disco.leerDato(pos), 1);
+                for (int j = 0; j < tamano; j++) {
+                    modelo.addRow(new Object[]{pos + j,
+                            "Virtual " + nombre + ": " + disco.leerInstruccion(pos + j).getLineaOriginal()});
+                }
+                pos += tamano;
+            } else {
+                int inicioLibre = pos;
+                while (pos <= finVirtual && disco.leerNombre(pos) == null) {
+                    pos++;
+                }
+                modelo.addRow(new Object[]{rango(inicioLibre, pos - 1), "Memoria virtual libre"});
+            }
+        }
+    }
+
+    // El kernel es el 60% de la RAM: ahí caben 5 BCP y la Lista de Trabajo.
+    private int calcularKernel(int tamanoRAM) {
+        return Math.max((int) Math.round(tamanoRAM * 0.25), 16);
+    }
+
+    // Con programas sin terminar no se puede cargar más ni cambiar la memoria.
+    private void actualizarBotonesBloqueo() {
+        boolean hayTrabajo = planificador.getListaTrabajo().getCantidad() > 0;
+        vista.getBtnCargarArchivo().setEnabled(!hayTrabajo);
+        vista.getBtnConfigurarMemoria().setEnabled(!hayTrabajo);
+    }
+
+    private BCP buscarBCPPorPID(int pid) {
+        for (BCP proceso : planificador.getListaProcesos().getTodos()) {
+            if (proceso.getPID() == pid) {
+                return proceso;
+            }
+        }
+        return null;
+    }
+
+    private BCP buscarBCPEnDireccion(int direccionKernel) {
+        for (BCP proceso : planificador.getListaProcesos().getTodos()) {
+            if (proceso.getDireccionBase() == direccionKernel) {
+                return proceso;
+            }
+        }
+        return null;
+    }
+
+    private BCP buscarBCPDuenoDeRAM(int direccion) {
+        for (BCP proceso : planificador.getListaProcesos().getTodos()) {
+            if (proceso.getBase() != -1 && direccion >= proceso.getBase()
+                    && direccion < proceso.getBase() + proceso.getTamano()) {
+                return proceso;
+            }
+        }
+        return null;
     }
 
     private String rango(int inicio, int fin) {

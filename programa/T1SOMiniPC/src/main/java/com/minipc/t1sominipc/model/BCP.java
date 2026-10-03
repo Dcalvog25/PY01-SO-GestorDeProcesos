@@ -23,7 +23,7 @@ public class BCP {
     private static final int SIGUIENTE_BCP = 14;   // NUEVO: dirección del próximo BCP, -1 si no hay
     private static final int PILA = 15;
 
-    private static final int TAM_BCP = PILA + PilaBCP.getTamanoFijo(); // 15 + 5 = 21
+    private static final int TAM_BCP = PILA + PilaBCP.getTamanoFijo(); // 15 + 5 = 20
 
     private Memoria memoria;
     private int direccionBase;

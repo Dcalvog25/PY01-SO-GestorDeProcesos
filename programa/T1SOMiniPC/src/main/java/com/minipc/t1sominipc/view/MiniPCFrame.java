@@ -305,9 +305,9 @@ public class MiniPCFrame extends JFrame {
         spinnerTamanoRAM.setAlignmentX(Component.LEFT_ALIGNMENT);
         spinnerTamanoRAM.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
 
-        JLabel lblKernelInfo = crearEtiquetaCampo("Espacio de kernel (25% automático)");
+        JLabel lblKernelInfo = crearEtiquetaCampo("Espacio de kernel (60% automático)");
         lblKernelInfo.setAlignmentX(Component.LEFT_ALIGNMENT);
-        lblKernelCalculado = new JLabel("64 posiciones");
+        lblKernelCalculado = new JLabel("154 posiciones");
         lblKernelCalculado.setForeground(ACCENT_GREEN);
         lblKernelCalculado.setFont(new Font("Monospaced", Font.BOLD, 13));
         lblKernelCalculado.setAlignmentX(Component.LEFT_ALIGNMENT);
