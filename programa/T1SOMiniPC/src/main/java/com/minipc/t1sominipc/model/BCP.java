@@ -21,9 +21,14 @@ public class BCP {
     private static final int TIEMPO_EMPLEADO = 12; // NUEVO
     private static final int ARCHIVOS_ABIERTOS = 13; // NUEVO: cantidad, simplificado
     private static final int SIGUIENTE_BCP = 14;   // NUEVO: dirección del próximo BCP, -1 si no hay
-    private static final int PILA = 15;
+    private static final int BANDERAS = 15;             
+    private static final int CPU_ID = 16;          // CPU donde se ejecuta, 0 = ninguna
+    private static final int PILA = 17;
 
-    private static final int TAM_BCP = PILA + PilaBCP.getTamanoFijo(); // 15 + 5 = 20
+    private static final int BANDERA_ZERO = 1;
+        
+
+    private static final int TAM_BCP = PILA + PilaBCP.getTamanoFijo(); // 17 + 5 = 22
 
     private Memoria memoria;
     private int direccionBase;
@@ -52,6 +57,8 @@ public class BCP {
         memoria.escribir(direccionBase + TIEMPO_EMPLEADO, 0, "TiempoEmpleado");
         memoria.escribir(direccionBase + ARCHIVOS_ABIERTOS, 0, "ArchivosAbiertos");
         memoria.escribir(direccionBase + SIGUIENTE_BCP, -1, "SiguienteBCP");
+        memoria.escribir(direccionBase + BANDERAS, 0, "PSW");
+        memoria.escribir(direccionBase + CPU_ID, 0, "CPU");
 
         this.pila = new PilaBCP(memoria, direccionBase + PILA);
     }
@@ -124,6 +131,30 @@ public class BCP {
 
     public String getEstado() {
         return codigoAEstado(memoria.leer(direccionBase + ESTADO));
+    }
+
+    /*
+        * Nombre: setBanderas
+        * Descripción: Guarda el resultado de una comparación (CMP) en el PSW del proceso.
+     */
+    public void setBanderas(boolean zero) {
+        int psw = 0;
+        if (zero) {
+            psw |= BANDERA_ZERO;
+        }
+        memoria.escribir(direccionBase + BANDERAS, psw, "PSW");
+    }
+
+    public boolean isZero() {
+        return (memoria.leer(direccionBase + BANDERAS) & BANDERA_ZERO) != 0;
+    }
+
+    public void setCPU(int idCpu) {
+        memoria.escribir(direccionBase + CPU_ID, idCpu, "CPU");
+    }
+
+    public int getCPU() {
+        return memoria.leer(direccionBase + CPU_ID);
     }
 
     /* 

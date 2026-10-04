@@ -10,6 +10,8 @@ import java.util.List;
 
 public class CPU {
 
+    private static final int ID = 1; // única CPU del sistema
+
     private int AX;
     private int BX;
     private int CX;
@@ -19,7 +21,6 @@ public class CPU {
     private String IR; // Instruction Register - ahora es texto, ya no hay binario
     private int AC; // Accumulator
 
-    private boolean banderaIgual; // resultado de la última comparación (CMP), la usan JE/JNE
     private boolean esperandoEntrada;
 
     private Memoria memoria;
@@ -63,7 +64,6 @@ public class CPU {
         this.PC = memoria.getInicioMemoriaUsuario();
         this.IR = "";
         this.AC = 0;
-        this.banderaIgual = false;
         this.ultimoError = null;
     }
 
@@ -91,6 +91,7 @@ public class CPU {
      */
     public void asignarProceso(BCP nuevoBcp) {
         this.bcp = nuevoBcp;
+        nuevoBcp.setCPU(ID);
         this.AX = nuevoBcp.getAX();
         this.BX = nuevoBcp.getBX();
         this.CX = nuevoBcp.getCX();
@@ -301,20 +302,21 @@ public class CPU {
                 return false;
 
             case "CMP":
-                banderaIgual = (getRegistro(reg1) == getRegistro(reg2));
+                int diferencia = getRegistro(reg1) - getRegistro(reg2);
+                bcp.setBanderas(diferencia == 0);
                 return false;
 
             case "JMP":
                 return realizarSalto(PC + valor);
 
             case "JE":
-                if (banderaIgual) {
+                if (bcp.isZero()) {
                     return realizarSalto(PC + valor);
                 }
                 return false;
 
             case "JNE":
-                if (!banderaIgual) {
+                if (!bcp.isZero()) {
                     return realizarSalto(PC + valor);
                 }
                 return false;
