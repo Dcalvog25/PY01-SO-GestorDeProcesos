@@ -170,10 +170,6 @@ public class ControllerMiniPC {
             return nombre + ": ya hay un archivo con ese nombre en el disco.";
         }
 
-        if (!planificador.getListaTrabajo().hayEspacio()) {
-            return nombre + ": la Lista de Trabajo está llena (no queda espacio en el kernel).";
-        }
-
         if (!disco.guardarArchivo(nombre, programa)) {
             return nombre + ": no se pudo guardar en disco (sin espacio o índice lleno).";
         }
@@ -226,6 +222,10 @@ public class ControllerMiniPC {
         }
 
         StringBuilder aviso = new StringBuilder();
+        int enDisco = planificador.getEsperandoLista().size();
+        if (enDisco > 0) {
+            aviso.append(enDisco).append(" programa(s) esperan en Disco: la Lista de Trabajo del kernel está llena.\n");
+        }
         if (sinBCP > 0) {
             aviso.append(sinBCP).append(" programa(s) siguen en la Lista de Trabajo: no cabe otro BCP en el kernel "
                     + "(máximo ").append(planificador.getMaximoProcesos()).append(" procesos).\n");
@@ -422,7 +422,7 @@ public class ControllerMiniPC {
         *Descripción: Indica si aún hay programas en la Lista de Trabajo (sin terminar).
      */
     private boolean quedaTrabajoPendiente() {
-        return planificador.getListaTrabajo().getCantidad() > 0;
+        return planificador.getListaTrabajo().getCantidad() > 0 || !planificador.getEsperandoLista().isEmpty();
     }
 
     // ===================== RESET Y CONFIGURACIÓN =====================
@@ -573,6 +573,9 @@ public class ControllerMiniPC {
             } else {
                 modelo.addRow(new Object[]{"PID " + pid + " - " + trabajos.getNombre(i), proceso.getEstado()});
             }
+        }
+        for (String enDisco : planificador.getEsperandoLista()) {
+            modelo.addRow(new Object[]{"-- " + enDisco, "En Disco (espera lugar en Lista de Trabajo)"});
         }
     }
 
@@ -765,7 +768,7 @@ public class ControllerMiniPC {
 
     // Con programas sin terminar no se puede cargar más ni cambiar la memoria.
     private void actualizarBotonesBloqueo() {
-        boolean hayTrabajo = planificador.getListaTrabajo().getCantidad() > 0;
+        boolean hayTrabajo = quedaTrabajoPendiente();
         vista.getBtnCargarArchivo().setEnabled(!hayTrabajo);
         vista.getBtnConfigurarMemoria().setEnabled(!hayTrabajo);
     }

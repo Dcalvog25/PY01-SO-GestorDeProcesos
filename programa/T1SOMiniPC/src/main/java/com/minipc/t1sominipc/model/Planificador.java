@@ -16,6 +16,7 @@ public class Planificador {
     private ListaTrabajo listaTrabajo;
     private ListaProcesos listaProcesos;
     private Dispatcher dispatcher;
+    private List<String> esperandoLista; // ya están en Disco, esperan lugar en la Lista de Trabajo
 
     public Planificador(Memoria memoria, Disco disco) {
         this.memoria = memoria;
@@ -23,6 +24,7 @@ public class Planificador {
         this.listaProcesos = new ListaProcesos(memoria);
         this.listaTrabajo = new ListaTrabajo(memoria, listaProcesos.getFinZonaBCP() + 1);
         this.dispatcher = new Dispatcher();
+        this.esperandoLista = new ArrayList<>();
     }
 
     /*
@@ -37,15 +39,32 @@ public class Planificador {
 
     /*
         * Nombre: registrarTrabajo
-        * Descripción: Agrega a la Lista de Trabajo un programa ya guardado en Disco.
-        * Salida: false si no existe en Disco, ya estaba, o no hay espacio de kernel para la entrada.
+        * Descripción: Pasa a la Lista de Trabajo un programa ya guardado en Disco. Si la lista está
+        * llena, el programa espera en Disco hasta que se libere un lugar.
+        * Salida: false si no existe en Disco o ya estaba registrado.
      */
     public boolean registrarTrabajo(String nombreArchivo) {
-        if (!disco.existeArchivo(nombreArchivo)) {
+        if (!disco.existeArchivo(nombreArchivo) || listaTrabajo.buscar(nombreArchivo) != -1
+                || esperandoLista.contains(nombreArchivo)) {
             return false;
         }
-        return listaTrabajo.agregar(nombreArchivo, disco.getTamanoArchivo(nombreArchivo),
-                disco.getDireccionArchivo(nombreArchivo));
+        if (!listaTrabajo.agregar(nombreArchivo, disco.getTamanoArchivo(nombreArchivo),
+                disco.getDireccionArchivo(nombreArchivo))) {
+            esperandoLista.add(nombreArchivo);
+        }
+        return true;
+    }
+
+    // FCFS: los que esperaban en Disco entran a la Lista de Trabajo conforme se libera espacio.
+    private void pasarEsperandoALista() {
+        while (!esperandoLista.isEmpty() && listaTrabajo.hayEspacio()) {
+            String nombre = esperandoLista.remove(0);
+            listaTrabajo.agregar(nombre, disco.getTamanoArchivo(nombre), disco.getDireccionArchivo(nombre));
+        }
+    }
+
+    public List<String> getEsperandoLista() {
+        return esperandoLista;
     }
 
     /*
@@ -95,6 +114,7 @@ public class Planificador {
      */
     public BCP liberarProceso(BCP finalizado) {
         dispatcher.liberar(finalizado, listaTrabajo, listaProcesos, memoria);
+        pasarEsperandoALista();
 
         for (BCP bcp : listaProcesos.getTodos()) {
             dispatcher.swapIn(bcp, listaTrabajo, memoria, disco);
