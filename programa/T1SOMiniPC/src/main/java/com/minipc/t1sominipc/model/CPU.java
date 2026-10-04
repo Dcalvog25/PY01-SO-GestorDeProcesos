@@ -215,6 +215,7 @@ public class CPU {
         }
         DX = valor;
         pantalla.imprimir(String.valueOf(valor));
+        bcp.actualizarEstado("Ejecutando");
         esperandoEntrada = false;
 
         PC++;
@@ -393,6 +394,7 @@ public class CPU {
         }
         if (codigo == 0x09) {
             pantalla.imprimir(">> Ingresar valor:");
+            bcp.actualizarEstado("EnEspera");
             esperandoEntrada = true;
             return;
         }
