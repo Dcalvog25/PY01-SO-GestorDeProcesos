@@ -41,6 +41,8 @@ public class MiniPCFrame extends JFrame {
     private JDialog dialogoConfigMemoria;
     private JSpinner spinnerTamanoRAM;
     private JLabel lblKernelCalculado;
+    private JSpinner spinnerTamanoDisco;
+    private JLabel lblMemoriaVirtualCalculada;
     private JButton btnAplicarConfig;
 
     // Tablas y Modelos
@@ -302,7 +304,7 @@ public class MiniPCFrame extends JFrame {
     // ===================== VENTANA EMERGENTE DE CONFIGURACIÓN =====================
     private void crearDialogoConfigMemoria() {
         dialogoConfigMemoria = new JDialog(this, "Configurar Sistema", true);
-        dialogoConfigMemoria.setSize(320, 260);
+        dialogoConfigMemoria.setSize(380, 420);
         dialogoConfigMemoria.setLocationRelativeTo(this);
         dialogoConfigMemoria.getContentPane().setBackground(BG_CARD);
 
@@ -311,7 +313,7 @@ public class MiniPCFrame extends JFrame {
         panel.setBackground(BG_CARD);
         panel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
 
-        JLabel titulo = new JLabel("Configuración de memoria RAM");
+        JLabel titulo = new JLabel("Configuración de RAM y Disco");
         titulo.setFont(new Font("SansSerif", Font.BOLD, 14));
         titulo.setForeground(TEXT_LIGHT);
         titulo.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -322,18 +324,25 @@ public class MiniPCFrame extends JFrame {
         spinnerTamanoRAM.setAlignmentX(Component.LEFT_ALIGNMENT);
         spinnerTamanoRAM.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
 
-        JLabel lblKernelInfo = crearEtiquetaCampo("Espacio de kernel (25% automático)");
+        JLabel lblKernelInfo = crearEtiquetaCampo("Espacio de kernel (automático)");
         lblKernelInfo.setAlignmentX(Component.LEFT_ALIGNMENT);
-        lblKernelCalculado = new JLabel("64 posiciones");
+        lblKernelCalculado = new JLabel("--");
         lblKernelCalculado.setForeground(ACCENT_GREEN);
         lblKernelCalculado.setFont(new Font("Monospaced", Font.BOLD, 13));
         lblKernelCalculado.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-        spinnerTamanoRAM.addChangeListener(e -> {
-            int total = (Integer) spinnerTamanoRAM.getValue();
-            int kernel = Math.max((int) Math.round(total * 0.25), 16);
-            lblKernelCalculado.setText(kernel + " posiciones");
-        });
+        JLabel lblDisco = crearEtiquetaCampo("Tamaño total del disco");
+        lblDisco.setAlignmentX(Component.LEFT_ALIGNMENT);
+        spinnerTamanoDisco = new JSpinner(new SpinnerNumberModel(512, 512, 100000, 64));
+        spinnerTamanoDisco.setAlignmentX(Component.LEFT_ALIGNMENT);
+        spinnerTamanoDisco.setMaximumSize(new Dimension(Integer.MAX_VALUE, 30));
+
+        JLabel lblVirtualInfo = crearEtiquetaCampo("Memoria virtual (automática)");
+        lblVirtualInfo.setAlignmentX(Component.LEFT_ALIGNMENT);
+        lblMemoriaVirtualCalculada = new JLabel("--");
+        lblMemoriaVirtualCalculada.setForeground(ACCENT_GREEN);
+        lblMemoriaVirtualCalculada.setFont(new Font("Monospaced", Font.BOLD, 13));
+        lblMemoriaVirtualCalculada.setAlignmentX(Component.LEFT_ALIGNMENT);
 
         btnAplicarConfig = crearBoton("Aplicar configuración", BG_BUTTON_PRIMARY, TEXT_LIGHT);
         btnAplicarConfig.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -346,6 +355,12 @@ public class MiniPCFrame extends JFrame {
         panel.add(Box.createVerticalStrut(12));
         panel.add(lblKernelInfo);
         panel.add(lblKernelCalculado);
+        panel.add(Box.createVerticalStrut(16));
+        panel.add(lblDisco);
+        panel.add(spinnerTamanoDisco);
+        panel.add(Box.createVerticalStrut(12));
+        panel.add(lblVirtualInfo);
+        panel.add(lblMemoriaVirtualCalculada);
         panel.add(Box.createVerticalStrut(18));
         panel.add(btnAplicarConfig);
 
@@ -452,6 +467,15 @@ public class MiniPCFrame extends JFrame {
     
     public JSpinner getSpinnerTamanoRAM() { 
         return spinnerTamanoRAM; 
+    }
+    public JSpinner getSpinnerTamanoDisco() {
+        return spinnerTamanoDisco;
+    }
+    public JLabel getLblKernelCalculado() {
+        return lblKernelCalculado;
+    }
+    public JLabel getLblMemoriaVirtualCalculada() {
+        return lblMemoriaVirtualCalculada;
     }
     
     public DefaultTableModel getModeloProcesos() { 

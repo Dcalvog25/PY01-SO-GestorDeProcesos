@@ -3,6 +3,7 @@ package com.minipc.t1sominipc.controller;
 import com.minipc.t1sominipc.model.BCP;
 import com.minipc.t1sominipc.model.CPU;
 import com.minipc.t1sominipc.model.ConvertidorASM;
+import com.minipc.t1sominipc.model.Configuracion;
 import com.minipc.t1sominipc.model.Disco;
 import com.minipc.t1sominipc.model.Dispatcher;
 import com.minipc.t1sominipc.model.Instruccion;
@@ -19,6 +20,8 @@ import javax.swing.table.DefaultTableModel;
 import java.io.File;
 import java.io.IOException;
 import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -27,6 +30,9 @@ import java.util.List;
  */
 public class ControllerMiniPC {
 
+    private static final Path ARCHIVO_CONFIG = Paths.get("config.json");
+
+    private Configuracion config;
     private Memoria memoria;
     private BCP bcp; // proceso actualmente asignado a la CPU (puede ser null si no hay ninguno)
     private CPU cpu;
@@ -51,23 +57,61 @@ public class ControllerMiniPC {
     public ControllerMiniPC(MiniPCFrame vista) {
         this.vista = vista;
         this.parser = new ConvertidorASM();
-        inicializarMaquina(256, calcularKernel(256));
+        cargarConfiguracion();
+        inicializarMaquina();
         registrarEventos();
         actualizarVista();
     }
 
     /*
-        * Nombre: inicializarMaquina
-        *Entrada: int tamanoRAM, int tamanoKernel
+        * Nombre: cargarConfiguracion
+        *Entrada: void
         *Salida: void
-        *Descripción: Inicializa la máquina con los parámetros especificados.
+        *Descripción: Lee config.json y deja sus valores en el diálogo de configuración. Si no se
+        * puede leer, avisa y usa los valores mínimos del enunciado.
      */
-    private void inicializarMaquina(int tamanoRAM, int tamanoKernel) {
-        memoria = new Memoria(tamanoRAM, tamanoKernel);
+    private void cargarConfiguracion() {
+        try {
+            config = Configuracion.cargar(ARCHIVO_CONFIG);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(vista, "No se pudo leer config.json (" + ex.getMessage()
+                    + ").\nSe usarán RAM 256 y Disco 512.", "Configuración", JOptionPane.WARNING_MESSAGE);
+            config = new Configuracion(256, 25, 512, 12.5);
+        }
+        vista.getSpinnerTamanoRAM().setValue(config.getMemoriaRAM());
+        vista.getSpinnerTamanoDisco().setValue(config.getDisco());
+        actualizarEtiquetasConfig();
+    }
+
+    // El kernel y la memoria virtual crecen en porcentaje con la RAM y el Disco.
+    private void actualizarEtiquetasConfig() {
+        int ram = (Integer) vista.getSpinnerTamanoRAM().getValue();
+        int tamDisco = (Integer) vista.getSpinnerTamanoDisco().getValue();
+        vista.getLblKernelCalculado().setText(config.calcularKernel(ram) + " posiciones ("
+                + formatearPorcentaje(config.getPorcentajeKernel()) + "% de la RAM)");
+        vista.getLblMemoriaVirtualCalculada().setText(config.calcularMemoriaVirtual(tamDisco) + " posiciones ("
+                + formatearPorcentaje(config.getPorcentajeMemoriaVirtual()) + "% del disco)");
+    }
+
+    private String formatearPorcentaje(double porcentaje) {
+        if (porcentaje == Math.floor(porcentaje)) {
+            return String.valueOf((int) porcentaje);
+        }
+        return String.valueOf(porcentaje);
+    }
+
+    /*
+        * Nombre: inicializarMaquina
+        *Entrada: void
+        *Salida: void
+        *Descripción: Inicializa la máquina con la configuración actual (RAM, kernel, disco y memoria virtual).
+     */
+    private void inicializarMaquina() {
+        memoria = new Memoria(config.getMemoriaRAM(), config.calcularKernel(config.getMemoriaRAM()));
         bcp = null; // sin proceso en CPU hasta que se admita alguno
         pantalla = new Pantalla();
         cpu = new CPU(memoria, pantalla);
-        disco = new Disco(512, 64); 
+        disco = new Disco(config.getDisco(), config.calcularMemoriaVirtual(config.getDisco()));
         planificador = new Planificador(memoria,disco);
         dispatcher = new Dispatcher();
 
@@ -86,6 +130,8 @@ public class ControllerMiniPC {
         vista.getBtnEjecutarTodo().addActionListener(e -> ejecutarTodo());
         vista.getBtnLimpiarReset().addActionListener(e -> limpiarTodo());
         vista.getBtnAplicarConfig().addActionListener(e -> aplicarConfiguracion());
+        vista.getSpinnerTamanoRAM().addChangeListener(e -> actualizarEtiquetasConfig());
+        vista.getSpinnerTamanoDisco().addChangeListener(e -> actualizarEtiquetasConfig());
         vista.getTxtEntradaTeclado().addActionListener(e -> procesarEntradaTeclado());
     }
 
@@ -435,7 +481,7 @@ public class ControllerMiniPC {
      */
     private void limpiarTodo() {
         detenerAutomatico();
-        inicializarMaquina(memoria.getTamanoTotal(), memoria.getInicioMemoriaUsuario());
+        inicializarMaquina();
         finalizados = new ArrayList<>();
         ejecutandoAutomatico = false;
 
@@ -457,13 +503,19 @@ public class ControllerMiniPC {
         * Nombre: aplicarConfiguracion
         *Entrada: void
         *Salida: void
-        *Descripción: Aplica la configuración de la memoria.
+        *Descripción: Aplica la configuración de RAM y Disco, la guarda en config.json y reinicia la máquina.
      */
     private void aplicarConfiguracion() {
-        int nuevoTamano = (Integer) vista.getSpinnerTamanoRAM().getValue();
-        int nuevoKernel = calcularKernel(nuevoTamano);
+        config.setMemoriaRAM((Integer) vista.getSpinnerTamanoRAM().getValue());
+        config.setDisco((Integer) vista.getSpinnerTamanoDisco().getValue());
+        try {
+            config.guardar(ARCHIVO_CONFIG);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(vista, "No se pudo guardar config.json (" + ex.getMessage() + ").",
+                    "Configuración", JOptionPane.WARNING_MESSAGE);
+        }
 
-        inicializarMaquina(nuevoTamano, nuevoKernel);
+        inicializarMaquina();
         finalizados = new ArrayList<>();
         ejecutandoAutomatico = false;
 
@@ -759,11 +811,6 @@ public class ControllerMiniPC {
                 modelo.addRow(new Object[]{rango(inicioLibre, pos - 1), "Memoria virtual libre"});
             }
         }
-    }
-
-    // El kernel es el 25% de la RAM: ahí caben 5 BCP y la Lista de Trabajo.
-    private int calcularKernel(int tamanoRAM) {
-        return Math.max((int) Math.round(tamanoRAM * 0.25), 16);
     }
 
     // Con programas sin terminar no se puede cargar más ni cambiar la memoria.

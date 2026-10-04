@@ -1,0 +1,6 @@
+{
+  "memoriaRAM": 500,
+  "porcentajeKernel": 25.0,
+  "disco": 1024,
+  "porcentajeMemoriaVirtual": 12.5
+}
