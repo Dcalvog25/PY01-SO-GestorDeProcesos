@@ -6,6 +6,7 @@ import com.minipc.t1sominipc.model.ConvertidorASM;
 import com.minipc.t1sominipc.model.Configuracion;
 import com.minipc.t1sominipc.model.Disco;
 import com.minipc.t1sominipc.model.Dispatcher;
+import com.minipc.t1sominipc.model.Estadistica;
 import com.minipc.t1sominipc.model.Instruccion;
 import com.minipc.t1sominipc.model.ListaProcesos;
 import com.minipc.t1sominipc.model.ListaTrabajo;
@@ -43,8 +44,8 @@ public class ControllerMiniPC {
     private Planificador planificador;
     private Dispatcher dispatcher;
 
-    // "PID n - archivo" de los procesos ya terminados; su BCP se libera, solo se muestran en la tabla
-    private List<String> finalizados = new ArrayList<>();
+    // Resumen de cada proceso terminado; se copia del BCP antes de liberarlo
+    private List<Estadistica> estadisticas = new ArrayList<>();
     private boolean ejecutandoAutomatico = false; // true si "Ejecutar Todo" quedó pausado esperando teclado
     private Timer timerAuto; // un tick de CPU por segundo en modo automático
 
@@ -129,6 +130,7 @@ public class ControllerMiniPC {
         vista.getBtnPasoAPaso().addActionListener(e -> ejecutarPaso());
         vista.getBtnEjecutarTodo().addActionListener(e -> ejecutarTodo());
         vista.getBtnLimpiarReset().addActionListener(e -> limpiarTodo());
+        vista.getBtnEstadisticas().addActionListener(e -> mostrarEstadisticas());
         vista.getBtnAplicarConfig().addActionListener(e -> aplicarConfiguracion());
         vista.getSpinnerTamanoRAM().addChangeListener(e -> actualizarEtiquetasConfig());
         vista.getSpinnerTamanoDisco().addChangeListener(e -> actualizarEtiquetasConfig());
@@ -455,7 +457,8 @@ public class ControllerMiniPC {
     private void liberarYRegistrar(BCP finalizado) {
         ListaTrabajo trabajos = planificador.getListaTrabajo();
         int indice = trabajos.buscarPorPID(finalizado.getPID());
-        finalizados.add("PID " + finalizado.getPID() + " - " + trabajos.getNombre(indice));
+        estadisticas.add(new Estadistica(finalizado.getPID(), trabajos.getNombre(indice),
+                finalizado.getTiempoInicio(), System.currentTimeMillis() / 1000, finalizado.getTiempoEmpleado()));
 
         planificador.liberarProceso(finalizado);
         bcp = null; // su espacio de BCP pudo reutilizarse de inmediato por otro proceso
@@ -482,7 +485,7 @@ public class ControllerMiniPC {
     private void limpiarTodo() {
         detenerAutomatico();
         inicializarMaquina();
-        finalizados = new ArrayList<>();
+        estadisticas = new ArrayList<>();
         ejecutandoAutomatico = false;
 
         vista.getModeloMemoria().setRowCount(0);
@@ -516,7 +519,7 @@ public class ControllerMiniPC {
         }
 
         inicializarMaquina();
-        finalizados = new ArrayList<>();
+        estadisticas = new ArrayList<>();
         ejecutandoAutomatico = false;
 
         vista.getModeloMemoria().setRowCount(0);
@@ -531,6 +534,23 @@ public class ControllerMiniPC {
 
         actualizarVista();
         actualizarTablaDisco();
+    }
+
+    /*
+        * Nombre: mostrarEstadisticas
+        *Entrada: void
+        *Salida: void
+        *Descripción: Abre la ventana con proceso, hora:minuto de inicio y fin, y duración en segundos.
+     */
+    private void mostrarEstadisticas() {
+        Object[][] filas = new Object[estadisticas.size()][];
+        int total = 0;
+        for (int i = 0; i < filas.length; i++) {
+            Estadistica e = estadisticas.get(i);
+            filas[i] = new Object[]{e.getProceso(), e.getHoraInicio(), e.getHoraFin(), e.getDuracion()};
+            total += e.getDuracion();
+        }
+        vista.mostrarEstadisticas(filas, total);
     }
 
     // ===================== EXTRAS =====================
@@ -612,8 +632,8 @@ public class ControllerMiniPC {
     private void actualizarTablaProcesos() {
         DefaultTableModel modelo = vista.getModeloProcesos();
         modelo.setRowCount(0);
-        for (String terminado : finalizados) {
-            modelo.addRow(new Object[]{terminado, "Finalizado"});
+        for (Estadistica terminado : estadisticas) {
+            modelo.addRow(new Object[]{terminado.getProceso(), "Finalizado"});
         }
 
         ListaTrabajo trabajos = planificador.getListaTrabajo();
@@ -813,11 +833,12 @@ public class ControllerMiniPC {
         }
     }
 
-    // Con programas sin terminar no se puede cargar más ni cambiar la memoria.
+    // Con programas sin terminar no se puede cargar más ni cambiar la memoria, ni ver estadísticas.
     private void actualizarBotonesBloqueo() {
         boolean hayTrabajo = quedaTrabajoPendiente();
         vista.getBtnCargarArchivo().setEnabled(!hayTrabajo);
         vista.getBtnConfigurarMemoria().setEnabled(!hayTrabajo);
+        vista.getBtnEstadisticas().setEnabled(!hayTrabajo && !estadisticas.isEmpty());
     }
 
     private BCP buscarBCPPorPID(int pid) {

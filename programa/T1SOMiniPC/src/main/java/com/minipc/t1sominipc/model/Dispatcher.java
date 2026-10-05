@@ -6,7 +6,7 @@ import java.util.List;
  * Nombre: Dispatcher
  * Descripción: Ejecuta las acciones sobre los procesos: la admisión en dos pasos, el swap-in /
  * swap-out contra la memoria virtual del Disco, la liberación al terminar y el cambio de
- * contexto hacia la CPU. El Planificador decide quien y cuando; el Dispatcher hace el como.
+ * contexto hacia la CPU. El Planificador decide quien y cuando, el Dispatcher hace el como.
  *
  */
 public class Dispatcher {
@@ -111,6 +111,9 @@ public class Dispatcher {
         }
 
         entrante.actualizarEstado("Ejecutando");
+        if (entrante.getTiempoInicio() == 0) {
+            entrante.registrarInicio(System.currentTimeMillis() / 1000); 
+        }
         cpu.asignarProceso(entrante);
         return true;
     }

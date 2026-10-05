@@ -35,6 +35,7 @@ public class CPU {
 
     private int ticksRestantes; // ticks que faltan para terminar la instrucción en curso (0 = ninguna)
     private int pesoActual;     // peso total de la instrucción en curso
+    private long inicioEsperaTeclado; // ms en que empezó el INT 09H actual
 
     /*
         * Nombre: CPU
@@ -215,6 +216,9 @@ public class CPU {
         }
         DX = valor;
         pantalla.imprimir(String.valueOf(valor));
+        // La espera del teclado cuenta como tiempo del proceso hasta el Enter válido
+        long esperaMs = System.currentTimeMillis() - inicioEsperaTeclado;
+        bcp.registrarTiempoEmpleado(bcp.getTiempoEmpleado() + (int) Math.ceil(esperaMs / 1000.0));
         bcp.actualizarEstado("Ejecutando");
         esperandoEntrada = false;
 
@@ -395,6 +399,7 @@ public class CPU {
         if (codigo == 0x09) {
             pantalla.imprimir(">> Ingresar valor:");
             bcp.actualizarEstado("EnEspera");
+            inicioEsperaTeclado = System.currentTimeMillis();
             esperandoEntrada = true;
             return;
         }

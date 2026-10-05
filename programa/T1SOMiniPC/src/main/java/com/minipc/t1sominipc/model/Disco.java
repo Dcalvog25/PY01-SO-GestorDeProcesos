@@ -36,7 +36,7 @@ public class Disco {
         this.inicioZonaProgramas = tamanoIndice;
         this.inicioMemoriaVirtual = tamanoTotal - tamanoMemoriaVirtual;
 
-        // Los tres arreglos miden lo mismo, y se consultan con la misma direcciónigual que Memoria
+        // Los tres arreglos miden lo mismo, y se consultan con la misma dirección igual que Memoria
         this.datos = new int[tamanoTotal];
         this.contenido = new Instruccion[tamanoTotal];
         this.nombresArchivo = new String[tamanoTotal];
@@ -67,7 +67,7 @@ public class Disco {
         int direccion = siguienteDireccionLibre;
         int posIndice = cantidadArchivos * 2;
 
-        // El nombre se guarda en la MISMA dirección donde vive la entrada del índice
+        // El nombre se guarda en la misma dirección donde vive la entrada del índice
         datos[posIndice] = direccion;
         datos[posIndice + 1] = programa.size();
         nombresArchivo[posIndice] = nombre;

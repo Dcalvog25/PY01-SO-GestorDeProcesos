@@ -368,6 +368,35 @@ public class MiniPCFrame extends JFrame {
     }
 
     // ===================== HELPERS DE ESTILO =====================
+    public void mostrarEstadisticas(Object[][] filas, int totalSegundos) {
+        JDialog dialogo = new JDialog(this, "Estadísticas de ejecución", true);
+        dialogo.setSize(620, 380);
+        dialogo.setLocationRelativeTo(this);
+
+        JPanel panel = new JPanel(new BorderLayout(0, 10));
+        panel.setBackground(BG_DARK);
+        panel.setBorder(BorderFactory.createEmptyBorder(14, 14, 14, 14));
+
+        DefaultTableModel modelo = new DefaultTableModel(filas,
+                new Object[]{"Proceso", "Hora inicio", "Hora fin", "Duración (s)"}) {
+            @Override
+            public boolean isCellEditable(int row, int col) { return false; }
+        };
+        JScrollPane scroll = new JScrollPane(crearTablaEstilizada(modelo));
+        scroll.getViewport().setBackground(BG_CARD);
+        scroll.setBorder(BorderFactory.createLineBorder(BORDER_COLOR));
+
+        JLabel lblTotal = new JLabel("Total: " + filas.length + " proceso(s), " + totalSegundos + " s de CPU");
+        lblTotal.setFont(new Font("SansSerif", Font.BOLD, 12));
+        lblTotal.setForeground(TEXT_LIGHT);
+
+        panel.add(scroll, BorderLayout.CENTER);
+        panel.add(lblTotal, BorderLayout.SOUTH);
+        dialogo.add(panel);
+        dialogo.setVisible(true);
+    }
+
+    // ===================== HELPERS DE ESTILO =====================
     private JTable crearTablaEstilizada(DefaultTableModel modelo) {
         JTable tabla = new JTable(modelo);
         tabla.setBackground(BG_CARD);
