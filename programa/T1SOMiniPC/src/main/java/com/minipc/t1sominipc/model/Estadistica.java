@@ -1,26 +1,19 @@
 package com.minipc.t1sominipc.model;
 
-import java.time.Instant;
-import java.time.ZoneId;
-import java.time.format.DateTimeFormatter;
-
 /*
  * Nombre: Estadistica
  * Descripción: Resumen de un proceso ya terminado. Se copia del BCP antes de liberarlo,
- * porque su espacio de kernel se reutiliza.
+ * porque su espacio de kernel se reutiliza. Las horas son minutos desde medianoche.
  */
 public class Estadistica {
 
-    private static final DateTimeFormatter HORA_MINUTO =
-            DateTimeFormatter.ofPattern("HH:mm").withZone(ZoneId.systemDefault());
-
     private int pid;
     private String nombre;
-    private long inicio;  
-    private long fin;    
+    private int inicio;
+    private int fin;
     private int duracion; // segundos de CPU (ticks + espera de teclado)
 
-    public Estadistica(int pid, String nombre, long inicio, long fin, int duracion) {
+    public Estadistica(int pid, String nombre, int inicio, int fin, int duracion) {
         this.pid = pid;
         this.nombre = nombre;
         this.inicio = inicio;
@@ -33,14 +26,18 @@ public class Estadistica {
     }
 
     public String getHoraInicio() {
-        return HORA_MINUTO.format(Instant.ofEpochSecond(inicio));
+        return formatear(inicio);
     }
 
     public String getHoraFin() {
-        return HORA_MINUTO.format(Instant.ofEpochSecond(fin));
+        return formatear(fin);
     }
 
     public int getDuracion() {
         return duracion;
+    }
+
+    private static String formatear(int minutoDelDia) {
+        return String.format("%02d:%02d", minutoDelDia / 60, minutoDelDia % 60);
     }
 }

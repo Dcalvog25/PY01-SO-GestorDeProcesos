@@ -111,8 +111,8 @@ public class Dispatcher {
         }
 
         entrante.actualizarEstado("Ejecutando");
-        if (entrante.getTiempoInicio() == 0) {
-            entrante.registrarInicio(System.currentTimeMillis() / 1000); 
+        if (entrante.getTiempoInicio() == -1) {
+            entrante.registrarInicio(BCP.minutoDelDia());
         }
         cpu.asignarProceso(entrante);
         return true;

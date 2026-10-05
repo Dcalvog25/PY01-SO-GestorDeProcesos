@@ -13,6 +13,7 @@ import com.minipc.t1sominipc.model.ListaTrabajo;
 import com.minipc.t1sominipc.model.Memoria;
 import com.minipc.t1sominipc.model.Pantalla;
 import com.minipc.t1sominipc.model.Planificador;
+import com.minipc.t1sominipc.model.TablaArchivosKernel;
 import com.minipc.t1sominipc.view.MiniPCFrame;
 
 import javax.swing.*;
@@ -41,6 +42,7 @@ public class ControllerMiniPC {
     private ConvertidorASM parser;
     private MiniPCFrame vista;
     private Disco disco;
+    private TablaArchivosKernel tablaArchivos;
     private Planificador planificador;
     private Dispatcher dispatcher;
 
@@ -111,8 +113,9 @@ public class ControllerMiniPC {
         memoria = new Memoria(config.getMemoriaRAM(), config.calcularKernel(config.getMemoriaRAM()));
         bcp = null; // sin proceso en CPU hasta que se admita alguno
         pantalla = new Pantalla();
-        cpu = new CPU(memoria, pantalla);
         disco = new Disco(config.getDisco(), config.calcularMemoriaVirtual(config.getDisco()));
+        tablaArchivos = new TablaArchivosKernel();
+        cpu = new CPU(memoria, pantalla, disco, tablaArchivos);
         planificador = new Planificador(memoria,disco);
         dispatcher = new Dispatcher();
 
@@ -458,7 +461,8 @@ public class ControllerMiniPC {
         ListaTrabajo trabajos = planificador.getListaTrabajo();
         int indice = trabajos.buscarPorPID(finalizado.getPID());
         estadisticas.add(new Estadistica(finalizado.getPID(), trabajos.getNombre(indice),
-                finalizado.getTiempoInicio(), System.currentTimeMillis() / 1000, finalizado.getTiempoEmpleado()));
+                finalizado.getTiempoInicio(), BCP.minutoDelDia(), finalizado.getTiempoEmpleado()));
+        tablaArchivos.liberar(finalizado.getIdArchivosAbiertos());
 
         planificador.liberarProceso(finalizado);
         bcp = null; // su espacio de BCP pudo reutilizarse de inmediato por otro proceso
@@ -579,7 +583,11 @@ public class ControllerMiniPC {
                 continue;
             }
             for (int pos = inicio; pos < inicio + tamBCP; pos++) {
-                modelo.addRow(new Object[]{String.valueOf(pos), memoria.getLabel(pos) + " = " + memoria.leer(pos)});
+                String texto = memoria.getLabel(pos) + " = " + memoria.leer(pos);
+                if ("ArchivosAbiertos".equals(memoria.getLabel(pos))) {
+                    texto += " " + tablaArchivos.getAbiertos(memoria.leer(pos)); // ID -> nombres
+                }
+                modelo.addRow(new Object[]{String.valueOf(pos), texto});
             }
         }
 
@@ -761,7 +769,11 @@ public class ControllerMiniPC {
         vista.getLblAX().setText(String.valueOf(cpu.getAX()));
         vista.getLblBX().setText(String.valueOf(cpu.getBX()));
         vista.getLblCX().setText(String.valueOf(cpu.getCX()));
-        vista.getLblDX().setText(String.valueOf(cpu.getDX()));
+        if (cpu.getDxTexto() != null) {
+            vista.getLblDX().setText(cpu.getDxTexto());
+        } else {
+            vista.getLblDX().setText(String.valueOf(cpu.getDX()));
+        }
         vista.getLblPID().setText(bcp != null ? "PID " + bcp.getPID() : "PID --");
         String estado = (bcp != null) ? bcp.getEstado() : "Esperando archivo";
         if (bcp != null && cpu.getTicksRestantes() > 0) {
@@ -801,8 +813,9 @@ public class ControllerMiniPC {
             int direccion = disco.leerDato(i * 2);
             int tamano = disco.leerDato(i * 2 + 1);
             for (int j = 0; j < tamano; j++) {
-                modelo.addRow(new Object[]{direccion + j,
-                        nombre + ": " + disco.leerInstruccion(direccion + j).getLineaOriginal()});
+                Instruccion instr = disco.leerInstruccion(direccion + j);
+                String texto = (instr != null) ? instr.getLineaOriginal() : "dato = " + disco.leerDato(direccion + j);
+                modelo.addRow(new Object[]{direccion + j, nombre + ": " + texto});
             }
         }
         int inicioLibreProg = disco.getSiguienteDireccionLibre();

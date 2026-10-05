@@ -1,0 +1,21 @@
+MOV DX, "datos.txt"
+MOV AH, 3ch
+INT 21H
+MOV AH, 3dh
+INT 21H
+MOV DX, "otro.txt"
+MOV AH, 3ch
+INT 21H
+MOV AH, 3dh
+INT 21H
+MOV DX, "datos.txt"
+MOV AH, 3dh
+INT 21H
+MOV AL, 65
+MOV AH, 40h
+INT 21H
+MOV AH, 4dh
+INT 21H
+MOV AH, 41h
+INT 21H
+INT 20H

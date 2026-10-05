@@ -1,5 +1,7 @@
 package com.minipc.t1sominipc.model;
 
+import java.time.LocalTime;
+
 /**
  * BCP (Bloque de Control de Proceso). Cada instancia vive en su propio
  * segmento de memoria de kernel, indicado por direccionBase.
@@ -15,12 +17,12 @@ public class BCP {
     private static final int CX = 6;
     private static final int DX = 7;
     private static final int BASE = 8;
-    private static final int TAMANO = 9;       // NUEVO: Alcance
-    private static final int PRIORIDAD = 10;   // NUEVO
-    private static final int TIEMPO_INICIO = 11;   // NUEVO
-    private static final int TIEMPO_EMPLEADO = 12; // NUEVO
-    private static final int ARCHIVOS_ABIERTOS = 13; // NUEVO: cantidad, simplificado
-    private static final int SIGUIENTE_BCP = 14;   // NUEVO: dirección del próximo BCP, -1 si no hay
+    private static final int TAMANO = 9;       // 
+    private static final int PRIORIDAD = 10;   // 
+    private static final int TIEMPO_INICIO = 11;   // 
+    private static final int TIEMPO_EMPLEADO = 12; // 
+    private static final int ARCHIVOS_ABIERTOS = 13; // ID de su lista en TablaArchivosKernel, 0 = ninguna
+    private static final int SIGUIENTE_BCP = 14;   // 
     private static final int BANDERAS = 15;             
     private static final int CPU_ID = 16;          // CPU donde se ejecuta, 0 = ninguna
     private static final int PILA = 17;
@@ -53,7 +55,7 @@ public class BCP {
         memoria.escribir(direccionBase + BASE, baseUsuario, "Base");
         memoria.escribir(direccionBase + TAMANO, tamanoPrograma, "Tamano");
         memoria.escribir(direccionBase + PRIORIDAD, prioridad, "Prioridad");
-        memoria.escribir(direccionBase + TIEMPO_INICIO, 0, "TiempoInicio");
+        memoria.escribir(direccionBase + TIEMPO_INICIO, -1, "TiempoInicio");
         memoria.escribir(direccionBase + TIEMPO_EMPLEADO, 0, "TiempoEmpleado");
         memoria.escribir(direccionBase + ARCHIVOS_ABIERTOS, 0, "ArchivosAbiertos");
         memoria.escribir(direccionBase + SIGUIENTE_BCP, -1, "SiguienteBCP");
@@ -176,8 +178,21 @@ public class BCP {
         return memoria.leer(direccionBase + SIGUIENTE_BCP);
     }
 
-    public void registrarInicio(long tiempoActual) {
-        memoria.escribir(direccionBase + TIEMPO_INICIO, (int) tiempoActual, "TiempoInicio");
+    public static int minutoDelDia() {
+        LocalTime ahora = LocalTime.now();
+        return ahora.getHour() * 60 + ahora.getMinute();
+    }
+
+    public void registrarInicio(int minutoDelDia) {
+        memoria.escribir(direccionBase + TIEMPO_INICIO, minutoDelDia, "TiempoInicio");
+    }
+
+    public int getIdArchivosAbiertos() {
+        return memoria.leer(direccionBase + ARCHIVOS_ABIERTOS);
+    }
+
+    public void setIdArchivosAbiertos(int id) {
+        memoria.escribir(direccionBase + ARCHIVOS_ABIERTOS, id, "ArchivosAbiertos");
     }
 
     public void registrarTiempoEmpleado(long tiempoTotal) {

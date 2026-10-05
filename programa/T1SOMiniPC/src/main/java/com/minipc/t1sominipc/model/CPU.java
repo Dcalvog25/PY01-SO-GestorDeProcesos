@@ -26,6 +26,8 @@ public class CPU {
     private Memoria memoria;
     private BCP bcp;
     private Pantalla pantalla;
+    private Disco disco;
+    private TablaArchivosKernel tablaArchivos;
 
     private String ultimoError; // mensaje de error controlado
 
@@ -40,13 +42,15 @@ public class CPU {
     /*
         * Nombre: CPU
         * Descripcion: Constructor de la CPU.
-        * Entrada: Memoria memoria, BCP bcp
+        * Entrada: Memoria memoria, Pantalla pantalla, Disco disco, TablaArchivosKernel tablaArchivos
         * Salida: void
      */
-    public CPU(Memoria memoria, Pantalla pantalla) {
+    public CPU(Memoria memoria, Pantalla pantalla, Disco disco, TablaArchivosKernel tablaArchivos) {
         this.memoria = memoria;
         this.bcp = bcp;
         this.pantalla = pantalla;
+        this.disco = disco;
+        this.tablaArchivos = tablaArchivos;
         inicializarRegistros();
     }
 
@@ -104,6 +108,7 @@ public class CPU {
         this.ultimoError = null;
         this.ticksRestantes = 0;
         this.pesoActual = 0;
+        this.dxTexto = null;
     }
 
     /*
@@ -215,6 +220,7 @@ public class CPU {
             return;
         }
         DX = valor;
+        dxTexto = null;
         pantalla.imprimir(String.valueOf(valor));
         // La espera del teclado cuenta como tiempo del proceso hasta el Enter válido
         long esperaMs = System.currentTimeMillis() - inicioEsperaTeclado;
@@ -386,14 +392,14 @@ public class CPU {
         * Descripción: INT 20H termina el programa (se detecta en esFinDePrograma).
         * INT 10H imprime DX en pantalla de inmediato. INT 09H pausa la ejecución
         * hasta que el Controller entregue un valor con recibirEntrada().
-        * INT 21H (archivos) queda pendiente hasta construir Disco.
+        * INT 21H maneja archivos (ver llamadaArchivos).
      */
     private void ejecutarInterrupcion(int codigo) {
         if (codigo == 0x20) {
             return;
         }
         if (codigo == 0x10) {
-            pantalla.imprimir(String.valueOf(DX));
+            pantalla.imprimir(dxTexto != null ? dxTexto : String.valueOf(DX));
             return;
         }
         if (codigo == 0x09) {
@@ -403,7 +409,118 @@ public class CPU {
             esperandoEntrada = true;
             return;
         }
+        if (codigo == 0x21) {
+            llamadaArchivos();
+            return;
+        }
         ultimoError = "Interrupción INT " + Integer.toHexString(codigo).toUpperCase() + "H todavía no está implementada";
+    }
+
+    /*
+        * Nombre: llamadaArchivos
+        * Descripción: INT 21H. AH elige la función (3Ch crear, 3Dh abrir, 4Dh leer, 40h escribir,
+        * 41h eliminar), el nombre del archivo viene en DX (texto) y el contenido pasa por AL.
+        * Los errores quedan en ultimoError.
+     */
+    private void llamadaArchivos() {
+        int funcion = getRegistro("AH");
+        switch (funcion) {
+            case 0x3C:
+                crearArchivo();
+                break;
+            case 0x3D:
+                abrirArchivo();
+                break;
+            case 0x4D:
+                leerArchivo();
+                break;
+            case 0x40:
+                escribirArchivo();
+                break;
+            case 0x41:
+                eliminarArchivo();
+                break;
+            default:
+                ultimoError = "INT 21H: función AH = " + Integer.toHexString(funcion).toUpperCase()
+                        + "H no válida (usa 3Ch, 3Dh, 4Dh, 40h o 41h)";
+        }
+    }
+
+    // Devuelve el nombre guardado en DX, o null (con error) si DX no tiene texto.
+    private String nombreEnDX() {
+        if (dxTexto == null || dxTexto.trim().isEmpty()) {
+            ultimoError = "INT 21H: DX no tiene un nombre de archivo (usa MOV DX, \"archivo.txt\")";
+            return null;
+        }
+        return dxTexto;
+    }
+
+    // Devuelve el último archivo abierto del proceso, o null (con error) si no tiene ninguno.
+    private String ultimoArchivoAbierto() {
+        String nombre = tablaArchivos.ultimoAbierto(bcp.getIdArchivosAbiertos());
+        if (nombre == null) {
+            ultimoError = "Error de sistema: el proceso no tiene ningún archivo abierto (abre uno con AH = 3Dh)";
+        }
+        return nombre;
+    }
+
+    private void crearArchivo() {
+        String nombre = nombreEnDX();
+        if (nombre == null) {
+            return;
+        }
+        if (disco.existeArchivo(nombre)) {
+            ultimoError = "INT 21H: ya existe el archivo '" + nombre + "'";
+        } else if (!disco.crearArchivoDatos(nombre)) {
+            ultimoError = "INT 21H: no se pudo crear '" + nombre + "' (disco o índice lleno)";
+        }
+    }
+
+    private void abrirArchivo() {
+        String nombre = nombreEnDX();
+        if (nombre == null) {
+            return;
+        }
+        if (!disco.existeArchivo(nombre)) {
+            ultimoError = "INT 21H: el archivo '" + nombre + "' no existe en el disco";
+            return;
+        }
+        int id = bcp.getIdArchivosAbiertos();
+        if (id == 0) { // primera vez que este proceso abre un archivo
+            id = tablaArchivos.crearLista();
+            bcp.setIdArchivosAbiertos(id);
+        }
+        tablaArchivos.abrir(id, nombre);
+    }
+
+    private void leerArchivo() {
+        String nombre = ultimoArchivoAbierto();
+        if (nombre != null) {
+            setRegistro("AL", disco.leerDatoArchivo(nombre));
+        }
+        pantalla.imprimir("Valor leído de AL: " + String.valueOf(getRegistro("AL")));
+    }
+
+    private void escribirArchivo() {
+        String nombre = ultimoArchivoAbierto();
+        if (nombre != null) {
+            disco.escribirDatoArchivo(nombre, getRegistro("AL"));
+        }
+    }
+
+    private void eliminarArchivo() {
+        String nombre = nombreEnDX();
+        if (nombre == null) {
+            return;
+        }
+        if (!disco.existeArchivo(nombre)) {
+            ultimoError = "INT 21H: el archivo '" + nombre + "' no existe en el disco";
+        } else if (!disco.esArchivoDatos(nombre)) {
+            ultimoError = "INT 21H: '" + nombre + "' es un programa, solo se pueden eliminar archivos de datos";
+        } else {
+            disco.eliminarArchivo(nombre);
+            tablaArchivos.cerrarEnTodas(nombre);
+        }
     }
 
     /*
@@ -422,6 +539,10 @@ public class CPU {
                 return CX;
             case "DX": 
                 return DX;
+            case "AH": // AH y AL son las mitades de AX
+                return AX / 256;
+            case "AL":
+                return AX % 256;
             default: 
                 throw new IllegalArgumentException("Registro no reconocido: " + registro);
         }
@@ -447,6 +568,13 @@ public class CPU {
                 break;
             case "DX": 
                 DX = valor; 
+                dxTexto = null; // DX guarda un número o un texto, no ambos
+                break;
+            case "AH":
+                AX = (valor * 256) + getRegistro("AL");
+                break;
+            case "AL":
+                AX = (getRegistro("AH") * 256) + (valor % 256);
                 break;
             default: 
                 throw new IllegalArgumentException("Registro no reconocido: " + registro);
@@ -471,6 +599,9 @@ public class CPU {
     }
     public int getDX() { 
         return DX; 
+    }
+    public String getDxTexto() {
+        return dxTexto;
     }
     public int getPC() { 
         return PC; 

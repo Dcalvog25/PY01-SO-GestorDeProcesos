@@ -170,7 +170,13 @@ public class ConvertidorASM {
         }
 
         try {
-            int valor = Integer.parseInt(segundo);
+            int valor;
+            String segundoMayus2 = segundo;
+            if (segundoMayus2.matches("[0-9][0-9c-f]*h")) { // hexadecimal, ej. 3Ch
+                valor = Integer.parseInt(segundoMayus2.substring(0, segundoMayus2.length() - 1), 16);
+            } else {
+                valor = Integer.parseInt(segundo);
+            }
             if (!valorEnRango(valor)) {
                 registrarError(numeroLinea, linea, "Valor fuera de rango (-127 a 127): " + valor);
                 return null;
@@ -304,7 +310,7 @@ public class ConvertidorASM {
         * Salida: boolean - true si es válido, false en caso contrario
      */
     private boolean registroValido(String registro) {
-        if (registro.matches("AX|BX|CX|DX")) {
+        if (registro.matches("AX|BX|CX|DX|AH|AL")) {
             return true;
         }
         return false;

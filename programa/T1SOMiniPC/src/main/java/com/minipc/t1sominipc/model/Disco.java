@@ -116,6 +116,14 @@ public class Disco {
         }
 
         int indiceEliminado = posEliminar / 2;
+        int dirArchivo = datos[posEliminar];
+        int tamArchivo = datos[posEliminar + 1];
+        if (contenido[dirArchivo] == null) { // archivo de datos: libera su celda
+            datos[dirArchivo] = 0;
+            if (dirArchivo + tamArchivo == siguienteDireccionLibre) {
+                siguienteDireccionLibre -= tamArchivo;
+            }
+        }
         for (int i = indiceEliminado; i < cantidadArchivos - 1; i++) {
             datos[i * 2] = datos[(i + 1) * 2];
             datos[i * 2 + 1] = datos[(i + 1) * 2 + 1];
@@ -200,6 +208,51 @@ public class Disco {
             return true;
         }
         return false;
+    }
+
+    /*
+     * Nombre: crearArchivoDatos
+     * Descripción: INT 21H 3Ch. Crea un archivo de una sola celda (un número, inicia en 0) en elíndice
+     * y en la zona de programas. Las instrucciones de un programa nunca son null, así se distinguen.
+     * Salida: false si ya existe, el índice está lleno o no hay espacio.
+     */
+    public boolean crearArchivoDatos(String nombre) {
+        if (buscarPorNombre(nombre) != -1 || cantidadArchivos >= capacidadMaximaArchivos
+                || siguienteDireccionLibre + 1 > inicioMemoriaVirtual) {
+            return false;
+        }
+        int direccion = siguienteDireccionLibre;
+        int posIndice = cantidadArchivos * 2;
+
+        datos[posIndice] = direccion;
+        datos[posIndice + 1] = 1;
+        nombresArchivo[posIndice] = nombre;
+        datos[direccion] = 0;
+        contenido[direccion] = null;
+
+        cantidadArchivos++;
+        siguienteDireccionLibre++;
+        return true;
+    }
+
+    public boolean esArchivoDatos(String nombre) {
+        int posIndice = buscarPorNombre(nombre);
+        return posIndice != -1 && contenido[datos[posIndice]] == null;
+    }
+
+    public int leerDatoArchivo(String nombre) {
+        int posIndice = buscarPorNombre(nombre);
+        if (posIndice == -1) {
+            return 0;
+        }
+        return datos[datos[posIndice]];
+    }
+
+    public void escribirDatoArchivo(String nombre, int valor) {
+        int posIndice = buscarPorNombre(nombre);
+        if (posIndice != -1) {
+            datos[datos[posIndice]] = valor;
+        }
     }
 
     /*
