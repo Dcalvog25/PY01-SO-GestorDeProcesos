@@ -30,8 +30,32 @@ public class ConvertidorASM {
                 continue;
             }
 
-            String[] partes = lineaLimpia.split("[,\\s]+");
-            String operador = partes[0].toUpperCase();
+            String[] primeraParte = lineaLimpia.split("\\s+", 2); // separa el operador del resto
+            String operador = primeraParte[0].toUpperCase();
+
+            List<String> partesLista = new ArrayList<>();
+            partesLista.add(operador);
+
+            if (primeraParte.length > 1) {
+                String[] argumentos = primeraParte[1].split(",", -1); // -1 = no colapsa comas repetidas
+                boolean huecoVacio = false;
+
+                for (String arg : argumentos) {
+                    String argLimpio = arg.trim();
+                    if (argLimpio.isEmpty()) {
+                        huecoVacio = true;
+                        break;
+                    }
+                    partesLista.add(argLimpio);
+                }
+
+                if (huecoVacio) {
+                    registrarError(numeroLinea, linea, "Separador inválido: coma de más, vacía, o mal ubicada");
+                    continue;
+                }
+            }
+
+            String[] partes = partesLista.toArray(new String[0]);
 
             if (!operadorValido(operador)) {
                 registrarError(numeroLinea, linea, "Operador no reconocido: '" + partes[0] + "'");
@@ -40,7 +64,7 @@ public class ConvertidorASM {
 
             int argumentos = partes.length - 1;
             Instruccion instruccion = null;
-
+            
             switch (operador) {
                 case "LOAD":
                 case "STORE":

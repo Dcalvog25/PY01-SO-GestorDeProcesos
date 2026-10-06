@@ -1,0 +1,3 @@
+MOV AX, 10
+JMP 120 
+INT 20H

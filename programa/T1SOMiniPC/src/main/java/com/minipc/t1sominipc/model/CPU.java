@@ -183,6 +183,12 @@ public class CPU {
             return true; // la instrucción quedó a medias, esperando INT 09H
         }
 
+        if (esFinDePrograma(actual)) {
+            bcp.actualizarRegistros(PC, AC, AX, BX, CX, DX);
+            bcp.actualizarEstado("Finalizado");
+            return false;
+        }
+
         if (!salto) {
             PC++;
         }
@@ -202,11 +208,12 @@ public class CPU {
         //bcp.avanzarContador();
         bcp.actualizarRegistros(PC, AC, AX, BX, CX, DX);
 
+        /* 
         if (esFinDePrograma(actual)) {
             bcp.actualizarEstado("Finalizado");
             return false;
         }
-
+        */
         return true;
     }
 
