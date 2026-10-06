@@ -126,7 +126,7 @@ public class Instruccion {
                     return 5;
                 }
                 if (valor != null && valor == 0x09) {
-                    return 3;
+                    return 1;
                 }
                 return 2;
             default:

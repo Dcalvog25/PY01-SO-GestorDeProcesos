@@ -35,7 +35,7 @@ public class Dispatcher {
         int base = memoria.asignarBloque(programa.size());
         if (base == -1) {
             swapOut(nombre, programa, disco);
-            bcp.actualizarEstado("EnEspera");
+            bcp.actualizarEstado("Suspendido");
         } else {
             memoria.cargarPrograma(programa, base);
             bcp.asignarBase(base);
