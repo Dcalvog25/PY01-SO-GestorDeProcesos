@@ -183,6 +183,12 @@ public class CPU {
             return true; // la instrucción quedó a medias, esperando INT 09H
         }
 
+        // Si la ejecución generó un error de seguridad (salto fuera de rango, pila overflow, etc),
+        // el proceso ya fue marcado como Finalizado en ejecutar(), así que retornamos false
+        if ("Finalizado".equals(bcp.getEstado())) {
+            return false;
+        }
+
         if (esFinDePrograma(actual)) {
             bcp.actualizarRegistros(PC, AC, AX, BX, CX, DX);
             bcp.actualizarEstado("Finalizado");
@@ -344,6 +350,9 @@ public class CPU {
                 boolean cupoPush = bcp.getPila().push(getRegistro(reg1));
                 if (!cupoPush) {
                     ultimoError = "Desbordamiento de pila al hacer PUSH " + reg1;
+                    bcp.actualizarEstado("Finalizado");
+                    bcp.actualizarRegistros(PC, AC, AX, BX, CX, DX);
+                    return false;
                 }
                 return false;
 
@@ -351,6 +360,8 @@ public class CPU {
                 Integer valorSacado = bcp.getPila().pop();
                 if (valorSacado == null) {
                     ultimoError = "La pila está vacía, no se puede hacer POP";
+                    bcp.actualizarEstado("Finalizado");
+                    bcp.actualizarRegistros(PC, AC, AX, BX, CX, DX);
                 } else {
                     setRegistro(reg1, valorSacado);
                 }
@@ -361,7 +372,9 @@ public class CPU {
                     boolean cupoParam = bcp.getPila().push(p);
                     if (!cupoParam) {
                         ultimoError = "Desbordamiento de pila al ejecutar PARAM";
-                        break;
+                        bcp.actualizarEstado("Finalizado");
+                        bcp.actualizarRegistros(PC, AC, AX, BX, CX, DX);
+                        return false;
                     }
                 }
                 return false;
@@ -378,8 +391,9 @@ public class CPU {
     /*
         * Nombre: realizarSalto
         * Descripción: Realiza un salto a la dirección especificada si está dentro del rango del programa cargado.
+        * Si el salto está fuera de rango, marca el proceso como Finalizado con un ultimoError explicativo.
         * Entrada: int direccionDestino
-        * Salida: boolean - true si el salto fue exitoso, false si está fuera de rango
+        * Salida: boolean - true si el salto fue exitoso, false en caso contrario
     */
 
     private boolean realizarSalto(int direccionDestino) {
@@ -387,7 +401,10 @@ public class CPU {
         int fin = inicio + programaActualTamano - 1;
 
         if (direccionDestino < inicio || direccionDestino > fin) {
-            ultimoError = "Salto fuera de rango del programa: intentó ir a la posición " + direccionDestino;
+            ultimoError = "Salto fuera de rango del programa: intentó ir a la posición " + direccionDestino 
+                    + " (rango válido: " + inicio + " a " + fin + ")";
+            bcp.actualizarEstado("Finalizado");
+            bcp.actualizarRegistros(PC, AC, AX, BX, CX, DX);
             return false;
         }
 

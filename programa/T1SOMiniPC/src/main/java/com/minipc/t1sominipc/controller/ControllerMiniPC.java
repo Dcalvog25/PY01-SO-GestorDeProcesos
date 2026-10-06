@@ -347,7 +347,12 @@ public class ControllerMiniPC {
         }
 
         if (cpu.getUltimoError() != null) {
-            JOptionPane.showMessageDialog(vista, cpu.getUltimoError(),
+            String mensajeError = cpu.getUltimoError();
+            // Si el proceso fue finalizado, agregar una nota al mensaje
+            if ("Finalizado".equals(bcp.getEstado())) {
+                mensajeError += "\n\n[Proceso finalizado por error de seguridad]";
+            }
+            JOptionPane.showMessageDialog(vista, mensajeError,
                     "Aviso de ejecución", JOptionPane.WARNING_MESSAGE);
         }
 
@@ -393,7 +398,8 @@ public class ControllerMiniPC {
         *Entrada: void
         *Salida: void
         *Descripción: Un segundo del modo automático: despacha al siguiente proceso (ese tick es el
-        * cambio de contexto) o avanza un tick de la instrucción en curso.
+        * cambio de contexto) o avanza un tick de la instrucción en curso. Si hay un error de seguridad,
+        * se muestra el mensaje y el proceso se finaliza automáticamente.
      */
     private void tickAutomatico() {
         if (bcp == null) {
@@ -424,8 +430,13 @@ public class ControllerMiniPC {
 
         boolean fin = !continua && !quedaTrabajoPendiente();
         if (error != null) {
+            // Si hay un error de seguridad, el proceso fue finalizado automáticamente
+            String mensajeError = error;
+            if (!continua) {
+                mensajeError += "\n\n[Proceso finalizado por error de seguridad]";
+            }
             timerAuto.stop(); // el diálogo modal no debe dejar correr más ticks
-            JOptionPane.showMessageDialog(vista, error, "Aviso de ejecución", JOptionPane.WARNING_MESSAGE);
+            JOptionPane.showMessageDialog(vista, mensajeError, "Aviso de ejecución", JOptionPane.WARNING_MESSAGE);
             if (!fin) {
                 timerAuto.start();
             }
