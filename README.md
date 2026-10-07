@@ -1,4 +1,4 @@
-# Tarea 1: Principios de Sistemas Operativos
+# Proyecto 1: Principios de Sistemas Operativos
 
 ## Mini PC - Gestor de Procesos
 
