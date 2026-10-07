@@ -41,7 +41,7 @@ public class Dispatcher {
         int base = memoria.asignarBloque(programa.size());
         if (base == -1) {
             swapOut(nombre, programa, disco);
-            bcp.actualizarEstado("Suspendido");
+            bcp.actualizarEstado("EnEspera");
         } else {
             memoria.cargarPrograma(programa, base);
             bcp.asignarBase(base);
@@ -72,7 +72,10 @@ public class Dispatcher {
         if (!"EnEspera".equals(bcp.getEstado())) {
             return false;
         }
-        String nombre = trabajos.getNombre(trabajos.buscarPorPID(bcp.getPID()));
+        String nombre = bcp.getNombreArchivo();
+        if (nombre == null) {
+            return false;
+        }
 
         List<Instruccion> programa = disco.leerDeMemoriaVirtual(nombre);
         if (programa == null) {
