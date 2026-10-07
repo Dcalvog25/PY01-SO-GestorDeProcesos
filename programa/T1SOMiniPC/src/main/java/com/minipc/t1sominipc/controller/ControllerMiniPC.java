@@ -346,16 +346,7 @@ public class ControllerMiniPC {
             return;
         }
 
-        if (cpu.getUltimoError() != null) {
-            String mensajeError = cpu.getUltimoError();
-            // Si el proceso fue finalizado, agregar una nota al mensaje
-            if ("Finalizado".equals(bcp.getEstado())) {
-                mensajeError += "\n\n[Proceso finalizado por error de seguridad]";
-            }
-            JOptionPane.showMessageDialog(vista, mensajeError,
-                    "Aviso de ejecución", JOptionPane.WARNING_MESSAGE);
-        }
-
+        // Los errores de seguridad ya se muestran en pantalla, no es necesario un diálogo
         if (!continua) {
             liberarYRegistrar(bcp);
             actualizarVista();
@@ -398,12 +389,19 @@ public class ControllerMiniPC {
         *Entrada: void
         *Salida: void
         *Descripción: Un segundo del modo automático: despacha al siguiente proceso (ese tick es el
-        * cambio de contexto) o avanza un tick de la instrucción en curso. Si hay un error de seguridad,
-        * se muestra el mensaje y el proceso se finaliza automáticamente.
+        * cambio de contexto) o avanza un tick de la instrucción en curso. Los errores de seguridad
+        * se muestran en pantalla automáticamente.
      */
     private void tickAutomatico() {
         if (bcp == null) {
             BCP siguiente = planificador.siguienteProceso();
+            
+            // Si no hay proceso Preparado pero aún hay trabajos pendientes, intentar admitirlos
+            if (siguiente == null && planificador.getListaTrabajo().getCantidad() > 0) {
+                planificador.admitirPendientes();
+                siguiente = planificador.siguienteProceso();
+            }
+            
             if (siguiente == null || !dispatcher.cambiarContexto(cpu, null, siguiente)) {
                 terminarAutomatico();
                 return;
@@ -422,25 +420,14 @@ public class ControllerMiniPC {
             return;
         }
 
-        String error = cpu.getUltimoError();
         if (!continua) {
             liberarYRegistrar(bcp);
+            // Después de liberar espacio de BCP, intentar admitir procesos pendientes
+            planificador.admitirPendientes();
         }
         actualizarVista();
 
         boolean fin = !continua && !quedaTrabajoPendiente();
-        if (error != null) {
-            // Si hay un error de seguridad, el proceso fue finalizado automáticamente
-            String mensajeError = error;
-            if (!continua) {
-                mensajeError += "\n\n[Proceso finalizado por error de seguridad]";
-            }
-            timerAuto.stop(); // el diálogo modal no debe dejar correr más ticks
-            JOptionPane.showMessageDialog(vista, mensajeError, "Aviso de ejecución", JOptionPane.WARNING_MESSAGE);
-            if (!fin) {
-                timerAuto.start();
-            }
-        }
         if (fin) {
             terminarAutomatico();
         }
@@ -465,13 +452,17 @@ public class ControllerMiniPC {
         * Nombre: liberarYRegistrar
         *Entrada: BCP finalizado
         *Salida: void
-        *Descripción: Avisa al Planificador que un proceso terminó: se libera su RAM, su BCP y su
-        * entrada de la Lista de Trabajo, y se admite lo que estaba esperando. La CPU queda libre.
+        *Descripción: Cuando un proceso termina, registra sus estadísticas (obteniendo el nombre del BCP),
+        * libera sus recursos (RAM, BCP), y admite lo que estaba esperando. La CPU queda libre.
      */
     private void liberarYRegistrar(BCP finalizado) {
-        ListaTrabajo trabajos = planificador.getListaTrabajo();
-        int indice = trabajos.buscarPorPID(finalizado.getPID());
-        estadisticas.add(new Estadistica(finalizado.getPID(), trabajos.getNombre(indice),
+        // Obtener el nombre del archivo del BCP (se estableció durante la admisión)
+        String nombreArchivo = finalizado.getNombreArchivo();
+        if (nombreArchivo == null) {
+            nombreArchivo = "Desconocido";
+        }
+        
+        estadisticas.add(new Estadistica(finalizado.getPID(), nombreArchivo,
                 finalizado.getTiempoInicio(), BCP.minutoDelDia(), finalizado.getTiempoEmpleado()));
         tablaArchivos.liberar(finalizado.getIdArchivosAbiertos());
 
@@ -483,10 +474,19 @@ public class ControllerMiniPC {
         * Nombre: quedaTrabajoPendiente
         *Entrada: void
         *Salida: boolean
-        *Descripción: Indica si aún hay programas en la Lista de Trabajo (sin terminar).
+        *Descripción: Indica si aún hay programas sin terminar: en la Lista de Trabajo (sin BCP),
+        * esperando en Disco, o ya admitidos con BCP (Preparado/Ejecutando/EnEspera, no Finalizado).
      */
     private boolean quedaTrabajoPendiente() {
-        return planificador.getListaTrabajo().getCantidad() > 0 || !planificador.getEsperandoLista().isEmpty();
+        if (planificador.getListaTrabajo().getCantidad() > 0 || !planificador.getEsperandoLista().isEmpty()) {
+            return true;
+        }
+        for (BCP proceso : planificador.getListaProcesos().getTodos()) {
+            if (!"Finalizado".equals(proceso.getEstado())) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ===================== RESET Y CONFIGURACIÓN =====================
@@ -645,26 +645,34 @@ public class ControllerMiniPC {
         * Nombre: actualizarTablaProcesos
         *Entrada: void
         *Salida: void
-        *Descripción: Actualiza la tabla de la lista/cola de trabajos: todos los procesos admitidos
-        * (con su estado actual) más los que siguen esperando memoria disponible.
+        *Descripción: Actualiza la tabla de procesos: muestra los procesos terminados y los admitidos
+        * (obteniendo el nombre del BCP, no de ListaTrabajo que ya fue eliminada al admitir).
      */
     private void actualizarTablaProcesos() {
         DefaultTableModel modelo = vista.getModeloProcesos();
         modelo.setRowCount(0);
+        
+        // Mostrar procesos terminados
         for (Estadistica terminado : estadisticas) {
             modelo.addRow(new Object[]{terminado.getProceso(), "Finalizado"});
         }
 
-        ListaTrabajo trabajos = planificador.getListaTrabajo();
-        for (int i = 0; i < trabajos.getCantidad(); i++) {
-            int pid = trabajos.getPID(i);
-            BCP proceso = buscarBCPPorPID(pid);
-            if (proceso == null) {
-                modelo.addRow(new Object[]{"-- " + trabajos.getNombre(i), "Sin BCP (espera espacio de BCP)"});
-            } else {
-                modelo.addRow(new Object[]{"PID " + pid + " - " + trabajos.getNombre(i), proceso.getEstado()});
+        // Mostrar procesos admitidos (con BCP)
+        for (BCP proceso : planificador.getListaProcesos().getTodos()) {
+            String nombre = proceso.getNombreArchivo();
+            if (nombre == null) {
+                nombre = "Desconocido";
             }
+            modelo.addRow(new Object[]{"PID " + proceso.getPID() + " - " + nombre, proceso.getEstado()});
         }
+        
+        // Mostrar trabajos que aún esperan espacio de BCP en ListaTrabajo
+        for (int i = 0; i < planificador.getListaTrabajo().getCantidad(); i++) {
+            modelo.addRow(new Object[]{"-- " + planificador.getListaTrabajo().getNombre(i), 
+                    "Sin BCP (espera espacio de BCP)"});
+        }
+        
+        // Mostrar programas que esperan en Disco
         for (String enDisco : planificador.getEsperandoLista()) {
             modelo.addRow(new Object[]{"-- " + enDisco, "En Disco (espera lugar en Lista de Trabajo)"});
         }

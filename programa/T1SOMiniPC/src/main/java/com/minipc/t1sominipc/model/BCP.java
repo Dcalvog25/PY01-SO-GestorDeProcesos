@@ -35,6 +35,7 @@ public class BCP {
     private Memoria memoria;
     private int direccionBase;
     private PilaBCP pila;
+    private String nombreArchivo; // nombre del archivo/programa asociado a este proceso
 
     public BCP(Memoria memoria, int direccionBase, int pid, int baseUsuario, int tamanoPrograma, int prioridad) {
         this.memoria = memoria;
@@ -228,5 +229,13 @@ public class BCP {
             case 5: return "Finalizado";
             default: return "Desconocido";
         }
+    }
+
+    public void setNombreArchivo(String nombre) {
+        this.nombreArchivo = nombre;
+    }
+
+    public String getNombreArchivo() {
+        return nombreArchivo;
     }
 }

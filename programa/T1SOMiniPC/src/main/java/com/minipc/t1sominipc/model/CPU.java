@@ -38,6 +38,7 @@ public class CPU {
     private int ticksRestantes; // ticks que faltan para terminar la instrucción en curso (0 = ninguna)
     private int pesoActual;     // peso total de la instrucción en curso
     private long inicioEsperaTeclado; // ms en que empezó el INT 09H actual
+    private boolean ejecutandoInterrupcion; // flag que indica si una interrupción (INT 10H, INT 21H) está en progreso
 
     /*
         * Nombre: CPU
@@ -70,6 +71,7 @@ public class CPU {
         this.IR = "";
         this.AC = 0;
         this.ultimoError = null;
+        this.ejecutandoInterrupcion = false;
     }
 
     /*
@@ -131,10 +133,21 @@ public class CPU {
             IR = actual.getLineaOriginal();
             pesoActual = actual.getPeso();
             ticksRestantes = pesoActual;
+
+            // El estado se fija desde el primer tick para que se vea durante TODA la instrucción,
+            // no solo en el último tick (cuando paso() realmente la ejecuta).
+            if (requiereEsperaVisible(actual)) {
+                ejecutandoInterrupcion = true;
+                bcp.actualizarEstado("EnEspera");
+            } else {
+                ejecutandoInterrupcion = false;
+                bcp.actualizarEstado("Ejecutando");
+            }
         }
 
         ticksRestantes--;
         bcp.registrarTiempoEmpleado(bcp.getTiempoEmpleado() + 1);
+
         if (ticksRestantes > 0) {
             return true;
         }
@@ -175,7 +188,7 @@ public class CPU {
         }
 
         IR = actual.getLineaOriginal();
-        bcp.actualizarEstado("Ejecutando");
+        // El estado (Ejecutando / EnEspera) ya lo fijó tick() desde el primer tick de esta instrucción.
 
         boolean salto = ejecutar(actual);
 
@@ -195,6 +208,12 @@ public class CPU {
             return false;
         }
 
+        // Si una interrupción acaba de completarse, volver a estado "Ejecutando"
+        if (ejecutandoInterrupcion) {
+            ejecutandoInterrupcion = false;
+            bcp.actualizarEstado("Ejecutando");
+        }
+
         if (!salto) {
             PC++;
         }
@@ -206,6 +225,7 @@ public class CPU {
         if (PC < inicioPrograma || PC >= finPrograma) {
             ultimoError = "El proceso no terminó con INT 20H y se salió de su espacio de memoria; "
                     + "se finalizó forzosamente para proteger a los demás procesos.";
+            pantalla.imprimir("\n[Segmentation Fault - Memory Protection Violation]");
             bcp.actualizarEstado("Finalizado");
             bcp.actualizarRegistros(PC, AC, AX, BX, CX, DX);
             return false;
@@ -262,6 +282,21 @@ public class CPU {
             return true;
         }
         return false;
+    }
+
+    /*
+        * Nombre: requiereEsperaVisible
+        * Descripción: Indica si la instrucción debe mostrar "EnEspera" durante TODOS sus ticks
+        * (INT 10H imprimir, INT 21H archivos), desde el primer tick en que se obtiene.
+        * Entrada: Instruccion instruccion
+        * Salida: boolean
+     */
+    private boolean requiereEsperaVisible(Instruccion instruccion) {
+        if (!"INT".equals(instruccion.getOperador()) || instruccion.getValor() == null) {
+            return false;
+        }
+        int codigo = instruccion.getValor();
+        return codigo == 0x10 || codigo == 0x21;
     }
 
     /*
@@ -350,6 +385,7 @@ public class CPU {
                 boolean cupoPush = bcp.getPila().push(getRegistro(reg1));
                 if (!cupoPush) {
                     ultimoError = "Desbordamiento de pila al hacer PUSH " + reg1;
+                    pantalla.imprimir("\n[Segmentation Fault - Stack Overflow en PUSH]");
                     bcp.actualizarEstado("Finalizado");
                     bcp.actualizarRegistros(PC, AC, AX, BX, CX, DX);
                     return false;
@@ -360,6 +396,7 @@ public class CPU {
                 Integer valorSacado = bcp.getPila().pop();
                 if (valorSacado == null) {
                     ultimoError = "La pila está vacía, no se puede hacer POP";
+                    pantalla.imprimir("\n[Segmentation Fault - Stack Underflow en POP]");
                     bcp.actualizarEstado("Finalizado");
                     bcp.actualizarRegistros(PC, AC, AX, BX, CX, DX);
                 } else {
@@ -372,6 +409,7 @@ public class CPU {
                     boolean cupoParam = bcp.getPila().push(p);
                     if (!cupoParam) {
                         ultimoError = "Desbordamiento de pila al ejecutar PARAM";
+                        pantalla.imprimir("\n[Segmentation Fault - Stack Overflow en PARAM]");
                         bcp.actualizarEstado("Finalizado");
                         bcp.actualizarRegistros(PC, AC, AX, BX, CX, DX);
                         return false;
@@ -403,6 +441,7 @@ public class CPU {
         if (direccionDestino < inicio || direccionDestino > fin) {
             ultimoError = "Salto fuera de rango del programa: intentó ir a la posición " + direccionDestino 
                     + " (rango válido: " + inicio + " a " + fin + ")";
+            pantalla.imprimir("\n[Segmentation Fault - Invalid Jump Address]");
             bcp.actualizarEstado("Finalizado");
             bcp.actualizarRegistros(PC, AC, AX, BX, CX, DX);
             return false;
@@ -413,16 +452,18 @@ public class CPU {
     }
     /*
         * Nombre: ejecutarInterrupcion
-        * Descripción: INT 20H termina el programa (se detecta en esFinDePrograma).
-        * INT 10H imprime DX en pantalla de inmediato. INT 09H pausa la ejecución
-        * hasta que el Controller entregue un valor con recibirEntrada().
-        * INT 21H maneja archivos (ver llamadaArchivos).
+        * Descripción: Ejecuta las interrupciones del sistema.
+        * INT 20H termina el programa (se detecta en esFinDePrograma).
+        * INT 10H imprime DX en pantalla (marca breve "EnEspera" durante la operación).
+        * INT 09H pausa la ejecución esperando entrada del teclado (queda en "EnEspera").
+        * INT 21H maneja archivos (marca breve "EnEspera" durante la operación).
      */
     private void ejecutarInterrupcion(int codigo) {
         if (codigo == 0x20) {
             return;
         }
         if (codigo == 0x10) {
+            // Estado "EnEspera" ya se fijó desde el primer tick en tick(); solo imprime.
             pantalla.imprimir(dxTexto != null ? dxTexto : String.valueOf(DX));
             return;
         }
@@ -434,6 +475,7 @@ public class CPU {
             return;
         }
         if (codigo == 0x21) {
+            // Estado "EnEspera" ya se fijó desde el primer tick en tick(); solo ejecuta la operación.
             llamadaArchivos();
             return;
         }

@@ -14,6 +14,7 @@ public class Dispatcher {
     /*
         * Nombre: admitir
         * Descripción: Admisión de un trabajo en dos pasos secuenciales.
+        * El trabajo se elimina de la Lista de Trabajo una vez que se crea su BCP.
         * Entrada: nombre del trabajo, listas de trabajos y procesos, memoria y disco.
         * Salida: el BCP creado, o null si falló 
      */
@@ -28,7 +29,12 @@ public class Dispatcher {
             return null;
         }
         BCP bcp = procesos.crearBCP(trabajos.getTamano(indice));
+        bcp.setNombreArchivo(nombre); // guardar el nombre en el BCP
         trabajos.setPID(indice, bcp.getPID());
+        
+        // Eliminar el trabajo de la Lista de Trabajo una vez que tiene BCP asignado
+        // Esto libera espacio para que otros trabajos entren a la lista
+        trabajos.eliminar(nombre);
 
         // espacio del programa en RAM
         List<Instruccion> programa = disco.leerArchivo(nombre);
@@ -82,17 +88,15 @@ public class Dispatcher {
 
     /*
         * Nombre: liberar
-        * Descripción: Un proceso terminó: devuelve su RAM, su espacio de BCP y su entrada
-        * de la Lista de Trabajo.
+        * Descripción: Un proceso terminó: devuelve su RAM y su espacio de BCP.
+        * El trabajo ya fue eliminado de ListaTrabajo cuando se admitió (ver admitir()),
+        * así que solo se libera la RAM y el BCP.
      */
     public void liberar(BCP bcp, ListaTrabajo trabajos, ListaProcesos procesos, Memoria memoria) {
         if (bcp.getBase() != -1) {
             memoria.liberarBloque(bcp.getBase(), bcp.getTamano());
         }
-        int indice = trabajos.buscarPorPID(bcp.getPID());
-        if (indice != -1) {
-            trabajos.eliminar(trabajos.getNombre(indice));
-        }
+        // El trabajo ya fue eliminado durante la admisión, no hay que eliminarlo aquí
         procesos.eliminar(bcp);
     }
 
