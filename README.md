@@ -14,6 +14,9 @@
 
 ## Descripcion del proyecto
 
+<img width="1916" height="1011" alt="image" src="https://github.com/user-attachments/assets/ef877c39-7192-43ce-b605-a3fd97b063a6" />
+
+
 Mini PC es un simulador de una computadora y de los componentes basicos de un sistema operativo. La aplicacion permite cargar uno o varios programas escritos en un mini ensamblador, validarlos, almacenarlos en disco y ejecutarlos mediante una CPU simulada.
 
 El proyecto representa el ciclo **fetch-decode-execute** y permite observar en tiempo real la CPU, los registros, la memoria principal, los BCP, la cola de procesos, el disco, la memoria virtual, la pantalla y los estados de los procesos.
