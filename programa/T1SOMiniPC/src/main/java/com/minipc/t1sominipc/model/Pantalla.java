@@ -10,20 +10,41 @@ import java.util.List;
  */
 public class Pantalla {
 
+    /*
+        * Nombre: buffer
+        * Descripción: Lista que almacena los mensajes impresos en la pantalla.
+     */
     private List<String> buffer;
 
+    /*
+        * Nombre: Pantalla
+        * Descripción: Constructor de la clase Pantalla. Inicializa el buffer de mensajes.
+        * Entrada: void
+        * Salida: void
+     */
     public Pantalla() {
         buffer = new ArrayList<>();
     }
-
+    
     public void imprimir(String mensaje) {
         buffer.add(mensaje);
     }
 
+    /*
+        * Nombre: getContenido
+        * Descripción: Devuelve el contenido actual de la pantalla.
+        * Entrada: void
+        * Salida: List<String> - lista de mensajes en la pantalla.
+     */
     public List<String> getContenido() {
         return buffer;
     }
-
+    /*
+        * Nombre: limpiar
+        * Descripción: Limpia el contenido de la pantalla.
+        * Entrada: void
+        * Salida: void
+     */
     public void limpiar() {
         buffer.clear();
     }

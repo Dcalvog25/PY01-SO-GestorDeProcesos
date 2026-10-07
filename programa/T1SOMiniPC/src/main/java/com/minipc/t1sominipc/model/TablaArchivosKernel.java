@@ -21,6 +21,8 @@ public class TablaArchivosKernel {
         * Nombre: abrir
         * Descripción: Agrega el archivo al final de la lista; si ya estaba abierto, solo lo mueve
         * al final para que sea el último abierto.
+        * Entrada: int id, String nombre
+        * Salida: void
      */
     public void abrir(int id, String nombre) {
         List<String> lista = listas.get(id - 1);
@@ -31,6 +33,8 @@ public class TablaArchivosKernel {
     /*
         * Nombre: getAbiertos
         * Descripción: Nombres de los archivos abiertos de la lista con ese ID, del más antiguo al último abierto.
+        * Entrada: int id
+        * Salida: List<String> - lista de nombres de archivos abiertos.
      */
     public List<String> getAbiertos(int id) {
         if (id <= 0) {
@@ -39,6 +43,12 @@ public class TablaArchivosKernel {
         return new ArrayList<>(listas.get(id - 1));
     }
 
+    /*
+        * Nombre: ultimoAbierto
+        * Descripción: Devuelve el nombre del último archivo abierto en la lista con ese ID.
+        * Entrada: int id
+        * Salida: String - nombre del último archivo abierto, o null si no hay ninguno.
+     */
     public String ultimoAbierto(int id) {
         if (id <= 0 || listas.get(id - 1).isEmpty()) {
             return null;
@@ -47,12 +57,30 @@ public class TablaArchivosKernel {
         return lista.get(lista.size() - 1);
     }
 
+    /*
+        * Nombre: cerrarEnTodas
+        * Descripción: Cierra el archivo con el nombre dado en todas las listas de archivos abiertos.
+        * Entrada: String nombre
+        * Salida: void
+     */
     // Un archivo eliminado del disco deja de estar abierto en cualquier proceso.
     public void cerrarEnTodas(String nombre) {
         for (List<String> lista : listas) {
             lista.remove(nombre);
         }
     }
+
+    /*
+        * Nombre: liberar
+        * Descripción: Libera todos los archivos abiertos de la lista con ese ID.
+        * Entrada: int id
+        * Salida: void
+     */
+    
+    /*
+     */
+    // Fin de la documentación de liberar
+    
 
     public void liberar(int id) {
         if (id > 0) {

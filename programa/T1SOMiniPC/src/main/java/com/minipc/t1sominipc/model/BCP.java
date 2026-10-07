@@ -66,6 +66,12 @@ public class BCP {
         this.pila = new PilaBCP(memoria, direccionBase + PILA);
     }
 
+    /*
+        * Nombre: getPila
+        * Descripción: Devuelve la pila asociada a este BCP.
+        * Entrada: void
+        * Salida: PilaBCP
+     */
     public PilaBCP getPila() {
         return pila;
     }
@@ -73,6 +79,8 @@ public class BCP {
     /*
         * Nombre: asignarBase
         * Descripción: Se llama cuando el programa entra a RAM (admisión o swap-in).
+        * Entrada: int baseUsuario
+        * Salida: void
         * Mientras el proceso no está en RAM, Base y PC valen -1.
      */
     public void asignarBase(int baseUsuario) {
@@ -80,10 +88,22 @@ public class BCP {
         memoria.escribir(direccionBase + PC, baseUsuario, "PC");
     }
 
+    /*
+        * Nombre: getDireccionBase
+        * Descripción: Devuelve la dirección base en memoria del BCP.
+        * Entrada: void
+        * Salida: int
+     */
     public int getDireccionBase() {
         return direccionBase;
     }
 
+    /*
+        * Nombre: getTamanoBCP
+        * Descripción: Devuelve el tamaño en memoria de un BCP.
+        * Entrada: void
+        * Salida: int
+     */
     public static int getTamanoBCP() {
         return TAM_BCP;
     }
@@ -97,6 +117,12 @@ public class BCP {
         memoria.escribir(direccionBase + DX, dx, "DX");
     }
 
+    /*
+        * Nombre: getPC, getAC, getAX, getBX, getCX, getDX, getBase, getTamano, getPrioridad, getPID
+        * Descripción: Devuelven los valores de los registros y atributos del proceso almacenados en memoria.
+        * Entrada: void
+        * Salida: int
+     */
     public int getPC() { 
         return memoria.leer(direccionBase + PC); 
     }
@@ -128,9 +154,23 @@ public class BCP {
         return memoria.leer(direccionBase + PID); 
     }
 
+    /*
+        * Nombre: actualizarEstado
+        * Descripción: Actualiza el estado del proceso en memoria.
+        * Entrada: String estado
+        * Salida: void
+     */
+
     public void actualizarEstado(String estado) {
         memoria.escribir(direccionBase + ESTADO, estadoACodigo(estado), "Estado");
     }
+
+    /*
+        * Nombre: getEstado
+        * Descripción: Devuelve el estado del proceso almacenado en memoria.
+        * Entrada: void
+        * Salida: String
+     */
 
     public String getEstado() {
         return codigoAEstado(memoria.leer(direccionBase + ESTADO));
@@ -139,6 +179,8 @@ public class BCP {
     /*
         * Nombre: setBanderas
         * Descripción: Guarda el resultado de una comparación (CMP) en el PSW del proceso.
+        * Entrada: boolean zero
+        * Salida: void
      */
     public void setBanderas(boolean zero) {
         int psw = 0;
@@ -148,14 +190,33 @@ public class BCP {
         memoria.escribir(direccionBase + BANDERAS, psw, "PSW");
     }
 
+    /*
+        * Nombre: isZero
+        * Descripción: Devuelve true si la bandera zero está activada en el PSW del proceso.
+        * Entrada: void
+        * Salida: boolean
+     */
+
     public boolean isZero() {
         return (memoria.leer(direccionBase + BANDERAS) & BANDERA_ZERO) != 0;
     }
 
+    /*
+        * Nombre: setCPU
+        * Descripción: Asigna el ID de la CPU al proceso en memoria.
+        * Entrada: int idCpu
+        * Salida: void
+     */
     public void setCPU(int idCpu) {
         memoria.escribir(direccionBase + CPU_ID, idCpu, "CPU");
     }
 
+    /*
+        * Nombre: getCPU
+        * Descripción: Devuelve el ID de la CPU asignada al proceso en memoria.
+        * Entrada: void
+        * Salida: int
+     */
     public int getCPU() {
         return memoria.leer(direccionBase + CPU_ID);
     }
@@ -171,42 +232,103 @@ public class BCP {
     }
     */
 
+    
+    /*
+        * Nombre: setSiguienteBCP
+        * Descripción: Establece la dirección del siguiente BCP en memoria.
+        * Entrada: int direccion
+        * Salida: void
+     */
     public void setSiguienteBCP(int direccion) {
         memoria.escribir(direccionBase + SIGUIENTE_BCP, direccion, "SiguienteBCP");
     }
 
+    /*
+        * Nombre: getSiguienteBCP
+        * Descripción: Devuelve la dirección del siguiente BCP en memoria.
+        * Entrada: void
+        * Salida: int
+     */
     public int getSiguienteBCP() {
         return memoria.leer(direccionBase + SIGUIENTE_BCP);
     }
-
+    /*
+        * Nombre: minutoDelDia
+        * Descripción: Devuelve el minuto actual del día.
+        * Entrada: void
+        * Salida: int
+     */
     public static int minutoDelDia() {
         LocalTime ahora = LocalTime.now();
         return ahora.getHour() * 60 + ahora.getMinute();
     }
 
+    /*
+        * Nombre: registrarInicio
+        * Descripción: Registra el minuto de inicio del proceso en memoria.
+        * Entrada: int minutoDelDia
+        * Salida: void
+     */
     public void registrarInicio(int minutoDelDia) {
         memoria.escribir(direccionBase + TIEMPO_INICIO, minutoDelDia, "TiempoInicio");
     }
 
+    /*
+        * Nombre: getIdArchivosAbiertos
+        * Descripción: Devuelve el ID de los archivos abiertos por el proceso en memoria.
+        * Entrada: void
+        * Salida: int
+     */
     public int getIdArchivosAbiertos() {
         return memoria.leer(direccionBase + ARCHIVOS_ABIERTOS);
     }
 
+    /*
+        * Nombre: setIdArchivosAbiertos
+        * Descripción: Establece el ID de los archivos abiertos por el proceso en memoria.
+        * Entrada: int id
+        * Salida: void
+     */
     public void setIdArchivosAbiertos(int id) {
         memoria.escribir(direccionBase + ARCHIVOS_ABIERTOS, id, "ArchivosAbiertos");
     }
 
+    /*
+        * Nombre: registrarTiempoEmpleado
+        * Descripción: Registra el tiempo total empleado por el proceso en memoria.
+        * Entrada: long tiempoTotal
+        * Salida: void
+     */
     public void registrarTiempoEmpleado(long tiempoTotal) {
         memoria.escribir(direccionBase + TIEMPO_EMPLEADO, (int) tiempoTotal, "TiempoEmpleado");
     }
 
+    /*
+        * Nombre: getTiempoInicio
+        * Descripción: Devuelve el minuto de inicio del proceso en memoria.
+        * Entrada: void
+        * Salida: int
+     */
     public int getTiempoInicio() { 
         return memoria.leer(direccionBase + TIEMPO_INICIO); 
     }
+
+    /*
+        * Nombre: getTiempoEmpleado
+        * Descripción: Devuelve el tiempo total empleado por el proceso en memoria.
+        * Entrada: void
+        * Salida: int
+     */
     public int getTiempoEmpleado() { 
         return memoria.leer(direccionBase + TIEMPO_EMPLEADO); 
     }
 
+    /*
+        * Nombre: estadoACodigo
+        * Descripción: Convierte el estado del proceso a su código correspondiente.
+        * Entrada: String estado
+        * Salida: int
+     */
     private int estadoACodigo(String estado) {
         switch (estado) {
             case "Nuevo": return 0;
@@ -219,6 +341,12 @@ public class BCP {
         }
     }
 
+    /*
+        * Nombre: codigoAEstado
+        * Descripción: Convierte el código del estado del proceso a su representación en cadena.
+        * Entrada: int codigo
+        * Salida: String
+     */
     private String codigoAEstado(int codigo) {
         switch (codigo) {
             case 0: return "Nuevo";

@@ -30,6 +30,7 @@ public class Configuracion {
     /*
         * Nombre: cargar
         * Descripción: Lee la configuración de un archivo JSON plano.
+        * Entrada: Path ruta
         * Salida: la configuración, o IOException si falta el archivo, una clave o un valor no es válido.
      */
     public static Configuracion cargar(Path ruta) throws IOException {
@@ -46,6 +47,13 @@ public class Configuracion {
         return new Configuracion(ram, kernel, disco, virtual);
     }
 
+    /*
+        * Nombre: guardar
+        * Descripción: Guarda la configuración en un archivo JSON plano.
+        * Entrada: Path ruta
+        * Salida: void, IOException si ocurre un error al escribir el archivo.
+     */
+
     public void guardar(Path ruta) throws IOException {
         String json = String.format(Locale.US,
                 "{%n  \"memoriaRAM\": %d,%n  \"porcentajeKernel\": %s,%n  \"disco\": %d,%n  \"porcentajeMemoriaVirtual\": %s%n}%n",
@@ -53,6 +61,12 @@ public class Configuracion {
         Files.write(ruta, json.getBytes(StandardCharsets.UTF_8));
     }
 
+    /*
+        * Nombre: leerNumero
+        * Descripción: Extrae un número de un JSON plano dado su clave.
+        * Entrada: String json, String clave
+        * Salida: double, IOException si la clave no se encuentra.
+     */
     private static double leerNumero(String json, String clave) throws IOException {
         Matcher m = Pattern.compile("\"" + clave + "\"\\s*:\\s*(-?[0-9]+(?:\\.[0-9]+)?)").matcher(json);
         if (!m.find()) {
@@ -61,34 +75,82 @@ public class Configuracion {
         return Double.parseDouble(m.group(1));
     }
 
+    /*
+        * Nombre: calcularKernel
+        * Descripción: Calcula la cantidad de memoria destinada al kernel en base al tamaño de la RAM.
+        * Entrada: int tamanoRAM
+        * Salida: int
+     */
     public int calcularKernel(int tamanoRAM) {
         return Math.max((int) Math.round(tamanoRAM * porcentajeKernel / 100.0), 16);
     }
 
+    /*
+        * Nombre: calcularMemoriaVirtual
+        * Descripción: Calcula la cantidad de memoria virtual en base al tamaño del disco.
+        * Entrada: int tamanoDisco
+        * Salida: int
+     */
     public int calcularMemoriaVirtual(int tamanoDisco) {
         return Math.max((int) Math.round(tamanoDisco * porcentajeMemoriaVirtual / 100.0), 1);
     }
 
+    /*
+        * Nombre: getMemoriaRAM
+        * Descripción: Devuelve la cantidad de memoria RAM configurada.
+        * Entrada: void
+        * Salida: int
+     */
     public int getMemoriaRAM() {
         return memoriaRAM;
     }
 
+    /*
+        * Nombre: setMemoriaRAM
+        * Descripción: Establece la cantidad de memoria RAM configurada.
+        * Entrada: int memoriaRAM
+        * Salida: void
+     */
     public void setMemoriaRAM(int memoriaRAM) {
         this.memoriaRAM = memoriaRAM;
     }
 
+    /*
+        * Nombre: getDisco
+        * Descripción: Devuelve el tamaño del disco configurado.
+        * Entrada: void
+        * Salida: int
+     */
     public int getDisco() {
         return disco;
     }
 
+    /*
+        * Nombre: setDisco
+        * Descripción: Establece el tamaño del disco configurado.
+        * Entrada: int disco
+        * Salida: void
+     */
     public void setDisco(int disco) {
         this.disco = disco;
     }
 
+    /*
+        * Nombre: getPorcentajeKernel
+        * Descripción: Devuelve el porcentaje de memoria destinado al kernel.
+        * Entrada: void
+        * Salida: double
+     */
     public double getPorcentajeKernel() {
         return porcentajeKernel;
     }
 
+    /*
+        * Nombre: getPorcentajeMemoriaVirtual
+        * Descripción: Devuelve el porcentaje de memoria destinado a la memoria virtual.
+        * Entrada: void
+        * Salida: double
+     */
     public double getPorcentajeMemoriaVirtual() {
         return porcentajeMemoriaVirtual;
     }

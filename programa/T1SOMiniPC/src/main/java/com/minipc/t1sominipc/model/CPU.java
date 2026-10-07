@@ -512,7 +512,12 @@ public class CPU {
         }
     }
 
-    // Devuelve el nombre guardado en DX, o null (con error) si DX no tiene texto.
+    /*
+        * Nombre: nombreEnDX
+        * Descripción: Devuelve el nombre de archivo guardado en DX, o null (con error) si DX no tiene texto.
+        * Entrada: void
+        * Salida: String
+     */
     private String nombreEnDX() {
         if (dxTexto == null || dxTexto.trim().isEmpty()) {
             ultimoError = "INT 21H: DX no tiene un nombre de archivo (usa MOV DX, \"archivo.txt\")";
@@ -521,7 +526,12 @@ public class CPU {
         return dxTexto;
     }
 
-    // Devuelve el último archivo abierto del proceso, o null (con error) si no tiene ninguno.
+    /*
+        * Nombre: ultimoArchivoAbierto
+        * Descripción: Devuelve el último archivo abierto del proceso, o null (con error) si no tiene ninguno.
+        * Entrada: void
+        * Salida: String
+     */
     private String ultimoArchivoAbierto() {
         String nombre = tablaArchivos.ultimoAbierto(bcp.getIdArchivosAbiertos());
         if (nombre == null) {
@@ -529,7 +539,12 @@ public class CPU {
         }
         return nombre;
     }
-
+    /*
+        * Nombre: crearArchivo
+        * Descripción: Crea un archivo en el disco con el nombre especificado en DX.
+        * Entrada: void
+        * Salida: void
+     */
     private void crearArchivo() {
         String nombre = nombreEnDX();
         if (nombre == null) {
@@ -542,6 +557,12 @@ public class CPU {
         }
     }
 
+    /*
+        * Nombre: abrirArchivo
+        * Descripción: Abre un archivo en el disco con el nombre especificado en DX.
+        * Entrada: void
+        * Salida: void
+     */
     private void abrirArchivo() {
         String nombre = nombreEnDX();
         if (nombre == null) {
@@ -559,6 +580,12 @@ public class CPU {
         tablaArchivos.abrir(id, nombre);
     }
 
+    /*
+        * Nombre: leerArchivo
+        * Descripción: Lee un dato del último archivo abierto del proceso y lo guarda en AL.
+        * Entrada: void
+        * Salida: void
+     */
     private void leerArchivo() {
         String nombre = ultimoArchivoAbierto();
         if (nombre != null) {
@@ -567,6 +594,12 @@ public class CPU {
         pantalla.imprimir("Valor leído de AL: " + String.valueOf(getRegistro("AL")));
     }
 
+    /*
+        * Nombre: escribirArchivo
+        * Descripción: Escribe un dato en el último archivo abierto del proceso desde AL.
+        * Entrada: void
+        * Salida: void
+     */
     private void escribirArchivo() {
         String nombre = ultimoArchivoAbierto();
         if (nombre != null) {
@@ -574,6 +607,12 @@ public class CPU {
         }
     }
 
+    /*
+        * Nombre: eliminarArchivo
+        * Descripción: Elimina un archivo del disco con el nombre especificado en DX.
+        * Entrada: void
+        * Salida: void
+     */
     private void eliminarArchivo() {
         String nombre = nombreEnDX();
         if (nombre == null) {

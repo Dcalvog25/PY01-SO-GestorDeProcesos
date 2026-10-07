@@ -86,7 +86,12 @@ public class ControllerMiniPC {
         actualizarEtiquetasConfig();
     }
 
-    // El kernel y la memoria virtual crecen en porcentaje con la RAM y el Disco.
+    /*
+        * Nombre: actualizarEtiquetasConfig
+        *Entrada: void
+        *Salida: void
+        *Descripción: Actualiza las etiquetas de la vista con los valores calculados de kernel y memoria virtual.
+     */
     private void actualizarEtiquetasConfig() {
         int ram = (Integer) vista.getSpinnerTamanoRAM().getValue();
         int tamDisco = (Integer) vista.getSpinnerTamanoDisco().getValue();
@@ -96,6 +101,12 @@ public class ControllerMiniPC {
                 + formatearPorcentaje(config.getPorcentajeMemoriaVirtual()) + "% del disco)");
     }
 
+    /*
+        * Nombre: formatearPorcentaje
+        *Entrada: double porcentaje
+        *Salida: String
+        *Descripción: Devuelve el porcentaje como cadena, sin decimales si es un número entero.
+     */
     private String formatearPorcentaje(double porcentaje) {
         if (porcentaje == Math.floor(porcentaje)) {
             return String.valueOf((int) porcentaje);
@@ -433,6 +444,12 @@ public class ControllerMiniPC {
         }
     }
 
+    /*
+        * Nombre: detenerAutomatico
+        *Entrada: void
+        *Salida: void
+        *Descripción: Detiene la ejecución automática del CPU y habilita los botones correspondientes en la interfaz.
+     */
     private void detenerAutomatico() {
         if (timerAuto != null) {
             timerAuto.stop();
@@ -440,6 +457,13 @@ public class ControllerMiniPC {
         vista.getBtnPasoAPaso().setEnabled(true);
         vista.getBtnEjecutarTodo().setEnabled(true);
     }
+
+    /*
+        * Nombre: terminarAutomatico
+        *Entrada: void
+        *Salida: void
+        *Descripción: Finaliza la ejecución automática del CPU, deteniendo el timer y actualizando la vista.
+     */
 
     private void terminarAutomatico() {
         detenerAutomatico();
@@ -807,6 +831,12 @@ public class ControllerMiniPC {
         actualizarBotonesBloqueo();
     }
 
+    /*
+        * Nombre: actualizarTablaDisco
+        *Entrada: void
+        *Salida: void
+        *Descripción: Actualiza la tabla de disco en la vista con la información actual del disco.
+     */
     private void actualizarTablaDisco() {
         DefaultTableModel modelo = vista.getModeloDisco();
         modelo.setRowCount(0);
@@ -865,7 +895,12 @@ public class ControllerMiniPC {
         }
     }
 
-    // Con programas sin terminar no se puede cargar más ni cambiar la memoria, ni ver estadísticas.
+    /*
+        * Nombre: actualizarBotonesBloqueo
+        *Entrada: void
+        *Salida: void
+        *Descripción: Actualiza el estado de los botones de la interfaz según si hay trabajo pendiente o no.
+     */
     private void actualizarBotonesBloqueo() {
         boolean hayTrabajo = quedaTrabajoPendiente();
         vista.getBtnCargarArchivo().setEnabled(!hayTrabajo);
@@ -873,6 +908,12 @@ public class ControllerMiniPC {
         vista.getBtnEstadisticas().setEnabled(!hayTrabajo && !estadisticas.isEmpty());
     }
 
+    /*
+        * Nombre: buscarBCPPorPID
+        *Entrada: int pid
+        *Salida: BCP
+        *Descripción: Busca y devuelve el BCP correspondiente al PID dado. Devuelve null si no se encuentra.
+     */
     private BCP buscarBCPPorPID(int pid) {
         for (BCP proceso : planificador.getListaProcesos().getTodos()) {
             if (proceso.getPID() == pid) {
@@ -882,6 +923,12 @@ public class ControllerMiniPC {
         return null;
     }
 
+    /*
+        * Nombre: buscarBCPEnDireccion
+        *Entrada: int direccionKernel
+        *Salida: BCP
+        *Descripción: Busca y devuelve el BCP cuyo proceso tiene la dirección base igual a la dada. Devuelve null si no se encuentra.
+     */
     private BCP buscarBCPEnDireccion(int direccionKernel) {
         for (BCP proceso : planificador.getListaProcesos().getTodos()) {
             if (proceso.getDireccionBase() == direccionKernel) {
@@ -891,6 +938,12 @@ public class ControllerMiniPC {
         return null;
     }
 
+    /*
+        * Nombre: buscarBCPDuenoDeRAM
+        *Entrada: int direccion
+        *Salida: BCP
+        *Descripción: Busca y devuelve el BCP cuyo proceso posee la dirección de RAM especificada. Devuelve null si no se encuentra.
+     */
     private BCP buscarBCPDuenoDeRAM(int direccion) {
         for (BCP proceso : planificador.getListaProcesos().getTodos()) {
             if (proceso.getBase() != -1 && direccion >= proceso.getBase()
@@ -901,6 +954,12 @@ public class ControllerMiniPC {
         return null;
     }
 
+    /*
+        * Nombre: rango
+        *Entrada: int inicio, int fin
+        *Salida: String
+        *Descripción: Devuelve un rango en formato "inicio-fin" o solo "inicio" si son iguales.
+     */
     private String rango(int inicio, int fin) {
         if (inicio == fin) {
             return String.valueOf(inicio);

@@ -164,7 +164,9 @@ public class Disco {
     }
 
     /*
-     * Métodos de acceso a las propiedades del disco
+        * Nombre: Acceso a propiedades del disco.
+     * Descripción: Métodos de acceso a las propiedades del disco.
+
      */
     public int getTamanoIndice() { 
         return tamanoIndice; 
@@ -235,11 +237,23 @@ public class Disco {
         return true;
     }
 
+    /*
+     * Nombre: esArchivoDatos
+     * Descripción: Verifica si un archivo en el disco es un archivo de datos (no un programa).
+     * Entrada: String nombre
+     * Salida: boolean
+     */
     public boolean esArchivoDatos(String nombre) {
         int posIndice = buscarPorNombre(nombre);
         return posIndice != -1 && contenido[datos[posIndice]] == null;
     }
 
+    /*
+     * Nombre: leerDatoArchivo
+     * Descripción: Lee el dato de un archivo de datos en el disco.
+     * Entrada: String nombre
+     * Salida: int
+     */
     public int leerDatoArchivo(String nombre) {
         int posIndice = buscarPorNombre(nombre);
         if (posIndice == -1) {
@@ -248,6 +262,12 @@ public class Disco {
         return datos[datos[posIndice]];
     }
 
+    /*
+     * Nombre: escribirDatoArchivo
+     * Descripción: Escribe un dato en un archivo de datos en el disco.
+     * Entrada: String nombre, int valor
+     * Salida: void
+     */
     public void escribirDatoArchivo(String nombre, int valor) {
         int posIndice = buscarPorNombre(nombre);
         if (posIndice != -1) {
@@ -256,8 +276,10 @@ public class Disco {
     }
 
     /*
-     * Nombre: getDireccionArchivo / getTamanoArchivo
-     * Descripción: Leen del índice la dirección de disco y el tamaño de un archivo, o -1 si no existe.
+     * Nombre: getDireccionArchivo
+     * Descripción: Devuelve la dirección de disco de un archivo, o -1 si no existe.
+     * Entrada: String nombre
+     * Salida: int
      */
     public int getDireccionArchivo(String nombre) {
         int posIndice = buscarPorNombre(nombre);
@@ -267,6 +289,12 @@ public class Disco {
         return datos[posIndice];
     }
 
+    /*
+     * Nombre: getTamanoArchivo
+     * Descripción: Devuelve el tamaño de un archivo en el disco, o -1 si no existe.
+     * Entrada: String nombre
+     * Salida: int
+     */
     public int getTamanoArchivo(String nombre) {
         int posIndice = buscarPorNombre(nombre);
         if (posIndice == -1) {
@@ -278,6 +306,7 @@ public class Disco {
     /*
      * Nombre: guardarEnMemoriaVirtual
      * Descripción: Swap-out. Copia un programa a la zona de memoria virtual (primer hueco que quepa).
+     * Entrada: String nombre, List<Instruccion> programa
      * El nombre y el tamaño quedan en la primera dirección del bloque.
      * Salida: true si cupo, false si la memoria virtual no tiene un hueco suficiente.
      */
@@ -307,6 +336,8 @@ public class Disco {
     /*
      * Nombre: leerDeMemoriaVirtual
      * Descripción: Lee un programa que está en la memoria virtual. Devuelve null si no está.
+     * Entrada: String nombre
+     * Salida: List<Instruccion> o null si no está en memoria virtual.
      */
     public List<Instruccion> leerDeMemoriaVirtual(String nombre) {
         int base = buscarEnMemoriaVirtual(nombre);
@@ -323,6 +354,8 @@ public class Disco {
     /*
      * Nombre: liberarMemoriaVirtual
      * Descripción: Swap-in terminado: libera el bloque que ocupaba el programa en la memoria virtual.
+     * Entrada: String nombre
+     * Salida: void
      */
     public void liberarMemoriaVirtual(String nombre) {
         int base = buscarEnMemoriaVirtual(nombre);
@@ -338,10 +371,22 @@ public class Disco {
         nombresArchivo[base] = null;
     }
 
+    /* 
+     * Nombre: estaEnMemoriaVirtual
+     * Descripción: Verifica si un programa está en la memoria virtual.
+     * Entrada: String nombre
+     * Salida: boolean - true si está en memoria virtual, false en caso contrario.
+     */
     public boolean estaEnMemoriaVirtual(String nombre) {
         return buscarEnMemoriaVirtual(nombre) != -1;
     }
 
+    /*
+     * Nombre: buscarEnMemoriaVirtual
+     * Descripción: Busca la base de un programa en la memoria virtual. Devuelve -1 si no está.
+     * Entrada: String nombre
+     * Salida: int - base del programa en memoria virtual o -1 si no está.
+     */
     private int buscarEnMemoriaVirtual(String nombre) {
         for (int i = inicioMemoriaVirtual; i < tamanoTotal; i++) {
             if (nombre.equals(nombresArchivo[i])) {

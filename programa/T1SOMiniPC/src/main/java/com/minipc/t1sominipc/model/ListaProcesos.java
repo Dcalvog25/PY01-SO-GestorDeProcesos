@@ -25,7 +25,12 @@ public class ListaProcesos {
         this.siguientePID = 1;
     }
 
-    // Un cuarto del kernel se reserva para la Lista de Trabajo; el resto se divide en BCP.
+    /*
+        * Nombre: calcularMaximo
+        * Descripción: Calcula el número máximo de BCP que caben en el kernel.
+        * Entrada: Memoria memoria
+        * Salida: int - número máximo de BCP.
+     */
     private static int calcularMaximo(Memoria memoria) {
         int kernel = memoria.getFinMemoriaKernel() + 1;
         int paraBCP = kernel - kernel / 4;
@@ -35,6 +40,8 @@ public class ListaProcesos {
     /*
         * Nombre: getMaximo
         * Descripción: Cuántos BCP caben en el kernel configurado (tope duro de 5).
+        * Entrada: void
+        * Salida: int - número máximo de BCP que caben en el kernel.
      */
     public int getMaximo() {
         return espacioOcupado.length;
@@ -43,6 +50,8 @@ public class ListaProcesos {
     /*
         * Nombre: getFinZonaBCP
         * Descripción: Última dirección de kernel usada por la zona de BCP.
+        * Entrada: void
+        * Salida: int - última dirección de kernel usada por la zona de BCP.
      */
     public int getFinZonaBCP() {
         return getMaximo() * BCP.getTamanoBCP() - 1;
@@ -51,6 +60,8 @@ public class ListaProcesos {
     /*
         * Nombre: hayEspacioParaBCP
         * Descripción: Paso (a) de la admisión: ¿cabe un BCP más en el kernel?
+        * Entrada: void
+        * Salida: boolean - true si hay espacio para un BCP más, false en caso contrario.
      */
     public boolean hayEspacioParaBCP() {
         return procesos.size() < getMaximo();
@@ -60,6 +71,8 @@ public class ListaProcesos {
         * Nombre: crearBCP
         * Descripción: Crea un BCP en el primer espacio libre de kernel, en estado "Nuevo" y sin
         * dirección en RAM todavía (Base = -1). Devuelve null si no cabe.
+        * Entrada: int tamanoPrograma
+        * Salida: BCP - el BCP creado, o null si no hay espacio.
      */
     public BCP crearBCP(int tamanoPrograma) {
         for (int i = 0; i < espacioOcupado.length; i++) {
@@ -78,6 +91,8 @@ public class ListaProcesos {
     /*
         * Nombre: eliminar
         * Descripción: Quita un BCP de la lista y libera su espacio de kernel.
+        * Entrada: BCP bcp
+        * Salida: void      
      */
     public void eliminar(BCP bcp) {
         if (procesos.remove(bcp)) {
@@ -86,7 +101,12 @@ public class ListaProcesos {
         }
     }
 
-    // Cada BCP apunta a la dirección del siguiente; el último apunta a -1.
+    /*
+        * Nombre: reenlazar
+        * Descripción: Actualiza los punteros de cada BCP al siguiente en la lista.
+        * Entrada: void
+        * Salida: void
+     */
     private void reenlazar() {
         for (int i = 0; i < procesos.size(); i++) {
             int siguiente = -1;
@@ -100,15 +120,29 @@ public class ListaProcesos {
     /*
         * Nombre: getTodos
         * Descripción: Devuelve todos los BCP en la lista, en orden de llegada.
+        * Entrada: void
+        * Salida: List<BCP> - lista de todos los BCP.
      */
     public List<BCP> getTodos() {
         return procesos;
     }
 
+    /*
+        * Nombre: getCantidad
+        * Descripción: Devuelve la cantidad de BCP en la lista.
+        * Entrada: void
+        * Salida: int - número de BCP en la lista.
+     */
     public int getCantidad() {
         return procesos.size();
     }
 
+    /*
+        * Nombre: estaLlena
+        * Descripción: Comprueba si la lista de BCP ha alcanzado el máximo de procesos permitido.
+        * Entrada: int maximoProcesos
+        * Salida: boolean - true si la lista está llena, false en caso contrario.
+     */
     public boolean estaLlena(int maximoProcesos) {
         if(procesos.size() >= maximoProcesos) {
             return true;

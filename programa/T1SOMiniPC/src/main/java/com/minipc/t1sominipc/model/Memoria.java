@@ -284,6 +284,13 @@ public class Memoria {
         }
     }
 
+
+    /*
+        * Nombre: getEspacioLibreUsuario
+        *Entrada: void
+        *Salida: int
+        *Descripción: Devuelve la cantidad de espacio libre en la memoria de usuario.
+     */
     public int getEspacioLibreUsuario() {
         int libres = 0;
         for (int i = inicioMemoriaUsuario; i < tamanoTotal; i++) {

@@ -54,6 +54,8 @@ public class Dispatcher {
         * Nombre: swapOut
         * Descripción: Deja el programa en la memoria virtual del Disco. Si tampoco cabe ahí,
         * sigue disponible en su archivo del Disco y el swap-in lo leerá de allí.
+        * Entrada: String nombre, List<Instruccion> programa, Disco disco
+        * Salida: void
      */
     private void swapOut(String nombre, List<Instruccion> programa, Disco disco) {
         disco.guardarEnMemoriaVirtual(nombre, programa);
@@ -63,6 +65,8 @@ public class Dispatcher {
         * Nombre: swapIn
         * Descripción: Si hay RAM para un proceso "EnEspera", lo carga y pasa a "Preparado".
         * Salida: true si se hizo el swap-in.
+        * Entrada: BCP bcp, ListaTrabajo trabajos, Memoria memoria, Disco disco
+        * Salida: boolean - true si se hizo el swap-in, false en caso contrario.
      */
     public boolean swapIn(BCP bcp, ListaTrabajo trabajos, Memoria memoria, Disco disco) {
         if (!"EnEspera".equals(bcp.getEstado())) {
